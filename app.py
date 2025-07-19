@@ -15,13 +15,13 @@ COLOR_GRIS = "#F2F2F2"
 COLOR_TEXTO = "#333333"
 COLOR_FONDO = "#FFFFFF"
 
-# Benchmarks por KPI global y por costes fijos
+# Benchmarks globales y específicos (ajusta según informe)
 BENCHMARKS = {
     "Costes Directos": (0.50, 0.55),
     "Margen Bruto": (0.45, 0.50),
     "Costes Fijos": (0.15, 0.20),
     "EBITDA": (0.25, 0.30),
-    # Benchmarks por categoría de costes fijos
+    # Costes fijos por categoría
     "Estructura": (0.05, 0.07),
     "Alquiler": (0.02, 0.03),
     "Marketing": (0.02, 0.04),
@@ -34,7 +34,7 @@ BENCHMARKS = {
 # Función formateo números europeos
 # -------------------------------
 def format_euro(valor):
-    """Formatea número con puntos miles, sin decimales y €"""
+    """Formatea número con puntos miles y €"""
     formatted = f"{int(valor):,}".replace(",", "X").replace(".", ",").replace("X", ".")
     return f"{formatted} €"
 
@@ -84,50 +84,125 @@ param = data['parametros']
 result = data['resultados']
 
 # -------------------------------
-# Datos iniciales
+# Inicializar variables acumuladoras
 # -------------------------------
-facturacion_default = int(result['facturacion_total'])
-costes_directos_default = facturacion_default * (result['costes_directos'] / result['facturacion_total'])
-margen_bruto_default = facturacion_default - costes_directos_default
-
-# Inicializar detalle de costes fijos con valores del JSON
-costes_fijos_detalle = {cat: int(valor) for cat, valor in param['costes_fijos'].items()}
-costes_fijos_original = costes_fijos_detalle.copy()
+facturacion_total = 0
+costes_directos_total = 0
 
 # -------------------------------
-# Bloque KPIs Principales (siempre arriba)
+# BLOQUES POR LÍNEA DE NEGOCIO
 # -------------------------------
 st.title("💻 Simulador PyG Financiero para Empresa IT")
-st.markdown("Ajusta los costes fijos en detalle y observa el impacto en tiempo real.")
+st.markdown("Ajusta las variables clave de cada línea de negocio y analiza el impacto.")
 
-# Recalcular totales
-costes_fijos_total = sum(costes_fijos_detalle.values())
-ebitda = margen_bruto_default - costes_fijos_total
+for linea, valores in param['lineas_negocio'].items():
+    with st.expander(f"📦 {linea.capitalize()}", expanded=False):
+        st.markdown(f"**Configura los parámetros de {linea}**")
 
-costes_directos_pct = costes_directos_default / facturacion_default
-margen_bruto_pct = margen_bruto_default / facturacion_default
-costes_fijos_pct = costes_fijos_total / facturacion_default
-ebitda_pct = ebitda / facturacion_default
+        tarifa = st.slider(
+            f"Tarifa media {linea} (€)",
+            min_value=0,
+            max_value=int(valores['tarifa'] * 2),
+            value=int(valores['tarifa']),
+            step=100
+        )
 
-# Mostrar KPIs
-col1, col2, col3, col4, col5 = st.columns(5)
-with col1:
-    kpi_card("Facturación Total", facturacion_default, 1.0, tooltip="Ingresos totales estimados")
-with col2:
-    kpi_card("Costes Directos", costes_directos_default, costes_directos_pct, BENCHMARKS["Costes Directos"],
-             tooltip="Costes asociados directamente a la producción de servicios")
-with col3:
-    kpi_card("Margen Bruto", margen_bruto_default, margen_bruto_pct, BENCHMARKS["Margen Bruto"],
-             tooltip="Ingresos menos costes directos")
-with col4:
-    kpi_card("Costes Fijos", costes_fijos_total, costes_fijos_pct, BENCHMARKS["Costes Fijos"],
-             tooltip="Suma de todos los costes fijos")
-with col5:
-    kpi_card("EBITDA", ebitda, ebitda_pct, BENCHMARKS["EBITDA"],
-             tooltip="Beneficio antes de intereses, impuestos, depreciaciones y amortizaciones")
+        proyectos = st.slider(
+            f"Nº Proyectos {linea}",
+            min_value=0,
+            max_value=int(valores['proyectos'] * 2),
+            value=int(valores['proyectos']),
+            step=1
+        )
+
+        personas = st.slider(
+            f"Nº Personas {linea}",
+            min_value=0,
+            max_value=int(valores['personas'] * 2),
+            value=int(valores['personas']),
+            step=1
+        )
+
+        actividad = st.slider(
+            f"Nivel de actividad {linea} (%)",
+            min_value=0,
+            max_value=150,
+            value=int(valores['actividad'] * 100),
+            step=1
+        ) / 100  # convertir a ratio
+
+        # Cálculos
+        facturacion_linea = tarifa * proyectos * actividad
+        costes_directos_linea = personas * valores['coste_persona'] * actividad
+        margen_bruto_linea = facturacion_linea - costes_directos_linea
+
+        facturacion_total += facturacion_linea
+        costes_directos_total += costes_directos_linea
+
+        # KPIs línea
+        linea_cols = st.columns(3)
+        with linea_cols[0]:
+            kpi_card("Facturación", facturacion_linea, facturacion_linea / facturacion_total,
+                     tooltip="Ingresos generados por esta línea")
+        with linea_cols[1]:
+            kpi_card("Costes Directos", costes_directos_linea, costes_directos_linea / facturacion_linea,
+                     benchmark=BENCHMARKS["Costes Directos"],
+                     tooltip="Costes de personal directamente asignados")
+        with linea_cols[2]:
+            kpi_card("Margen Bruto", margen_bruto_linea, margen_bruto_linea / facturacion_linea,
+                     benchmark=BENCHMARKS["Margen Bruto"],
+                     tooltip="Ingresos menos costes directos")
 
 # -------------------------------
-# Gráfico cascada
+# BLOQUE COSTES FIJOS
+# -------------------------------
+costes_fijos = 0
+with st.expander("🏢 Costes Fijos", expanded=False):
+    st.markdown("Ajusta las partidas de costes fijos.")
+
+    cols_fijos = st.columns(len(param['costes_fijos']))
+    for idx, (categoria, valor) in enumerate(param['costes_fijos'].items()):
+        nuevo_valor = st.slider(
+            f"{categoria.capitalize()} (€)",
+            min_value=0,
+            max_value=int(valor * 2),
+            value=int(valor),
+            step=1000
+        )
+        costes_fijos += nuevo_valor
+
+        porcentaje = nuevo_valor / facturacion_total if facturacion_total > 0 else 0
+        benchmark_categoria = BENCHMARKS.get(categoria.capitalize())
+        with cols_fijos[idx]:
+            kpi_card(categoria.capitalize(), nuevo_valor, porcentaje,
+                     benchmark=benchmark_categoria,
+                     tooltip=f"Coste fijo en {categoria}")
+
+# -------------------------------
+# KPIs TOTALES EMPRESA
+# -------------------------------
+margen_bruto_total = facturacion_total - costes_directos_total
+ebitda_total = margen_bruto_total - costes_fijos
+
+st.header("📊 Resumen Total Empresa")
+total_cols = st.columns(5)
+with total_cols[0]:
+    kpi_card("Facturación Total", facturacion_total, 1.0, tooltip="Suma de todas las líneas")
+with total_cols[1]:
+    kpi_card("Costes Directos", costes_directos_total, costes_directos_total / facturacion_total,
+             benchmark=BENCHMARKS["Costes Directos"])
+with total_cols[2]:
+    kpi_card("Margen Bruto", margen_bruto_total, margen_bruto_total / facturacion_total,
+             benchmark=BENCHMARKS["Margen Bruto"])
+with total_cols[3]:
+    kpi_card("Costes Fijos", costes_fijos, costes_fijos / facturacion_total,
+             benchmark=BENCHMARKS["Costes Fijos"])
+with total_cols[4]:
+    kpi_card("EBITDA", ebitda_total, ebitda_total / facturacion_total,
+             benchmark=BENCHMARKS["EBITDA"])
+
+# -------------------------------
+# GRÁFICO CASCADA
 # -------------------------------
 fig = go.Figure(go.Waterfall(
     name="PyG",
@@ -135,9 +210,9 @@ fig = go.Figure(go.Waterfall(
     measure=["relative", "relative", "relative", "total"],
     x=["Ingresos", "Costes Directos", "Costes Fijos", "EBITDA"],
     textposition="outside",
-    text=[format_euro(facturacion_default), format_euro(-costes_directos_default),
-          format_euro(-costes_fijos_total), format_euro(ebitda)],
-    y=[facturacion_default, -costes_directos_default, -costes_fijos_total, ebitda],
+    text=[format_euro(facturacion_total), format_euro(-costes_directos_total),
+          format_euro(-costes_fijos), format_euro(ebitda_total)],
+    y=[facturacion_total, -costes_directos_total, -costes_fijos, ebitda_total],
     connector={"line": {"color": "rgb(63, 63, 63)"}}
 ))
 fig.update_layout(
@@ -148,38 +223,3 @@ fig.update_layout(
     margin=dict(l=10, r=10, t=40, b=10)
 )
 st.plotly_chart(fig, use_container_width=True)
-
-# -------------------------------
-# Bloque Costes Fijos - Ajustable
-# -------------------------------
-with st.expander("🏢 Ajustar Costes Fijos en Detalle", expanded=True):
-    st.markdown("Ajusta cada partida para analizar su impacto en la rentabilidad.")
-
-    # Total Costes Fijos arriba del bloque
-    kpi_card("Total Costes Fijos", costes_fijos_total, costes_fijos_pct, BENCHMARKS["Costes Fijos"],
-             tooltip="Suma de todos los costes fijos")
-
-    # Sliders y KPIs por categoría
-    detalle_cols = st.columns(len(costes_fijos_detalle))
-    for idx, (categoria, valor_actual) in enumerate(costes_fijos_detalle.items()):
-        with detalle_cols[idx]:
-            porcentaje = valor_actual / facturacion_default
-            benchmark_categoria = BENCHMARKS.get(categoria.capitalize())
-
-            # KPI dinámico por categoría
-            kpi_card(categoria.capitalize(), valor_actual, porcentaje, benchmark=benchmark_categoria,
-                     tooltip=f"Coste fijo en {categoria}")
-
-            # Marca valor original
-            st.markdown(f"<small style='color:{COLOR_TEXTO}'>Valor original: {format_euro(costes_fijos_original[categoria])}</small>",
-                        unsafe_allow_html=True)
-
-            # Slider
-            nuevo_valor = st.slider(
-                f"Ajustar {categoria.capitalize()} (€)",
-                min_value=0,
-                max_value=int(costes_fijos_original[categoria] * 2),
-                value=valor_actual,
-                step=1000
-            )
-            costes_fijos_detalle[categoria] = nuevo_valor
