@@ -92,80 +92,21 @@ margen_bruto_default = facturacion_default - costes_directos_default
 
 # Inicializar detalle de costes fijos con valores del JSON
 costes_fijos_detalle = {cat: int(valor) for cat, valor in param['costes_fijos'].items()}
+costes_fijos_original = costes_fijos_detalle.copy()
 
 # -------------------------------
-# Actualización en tiempo real
+# Actualización dinámica
 # -------------------------------
-# Bloque Visión General
 st.title("💻 Simulador PyG Financiero para Empresa IT")
 st.markdown("Ajusta los costes fijos en detalle y observa el impacto en tiempo real.")
 
-# Mostrar KPIs principales
-def actualizar_kpis():
-    costes_fijos_total = sum(costes_fijos_detalle.values())
-    ebitda = margen_bruto_default - costes_fijos_total
-
-    costes_directos_pct = costes_directos_default / facturacion_default
-    margen_bruto_pct = margen_bruto_default / facturacion_default
-    costes_fijos_pct = costes_fijos_total / facturacion_default
-    ebitda_pct = ebitda / facturacion_default
-
-    col1, col2, col3, col4, col5 = st.columns(5)
-    with col1:
-        kpi_card("Facturación Total", facturacion_default, 1.0, tooltip="Ingresos totales estimados")
-    with col2:
-        kpi_card("Costes Directos", costes_directos_default, costes_directos_pct, BENCHMARKS["Costes Directos"],
-                 tooltip="Costes asociados directamente a la producción de servicios")
-    with col3:
-        kpi_card("Margen Bruto", margen_bruto_default, margen_bruto_pct, BENCHMARKS["Margen Bruto"],
-                 tooltip="Ingresos menos costes directos")
-    with col4:
-        kpi_card("Costes Fijos", costes_fijos_total, costes_fijos_pct, BENCHMARKS["Costes Fijos"],
-                 tooltip="Costes de estructura y operativos")
-    with col5:
-        kpi_card("EBITDA", ebitda, ebitda_pct, BENCHMARKS["EBITDA"],
-                 tooltip="Beneficio antes de intereses, impuestos, depreciaciones y amortizaciones")
-
-    # Gráfico cascada
-    fig = go.Figure(go.Waterfall(
-        name="PyG",
-        orientation="v",
-        measure=["relative", "relative", "relative", "total"],
-        x=["Ingresos", "Costes Directos", "Costes Fijos", "EBITDA"],
-        textposition="outside",
-        text=[format_euro(facturacion_default), format_euro(-costes_directos_default),
-              format_euro(-costes_fijos_total), format_euro(ebitda)],
-        y=[facturacion_default, -costes_directos_default, -costes_fijos_total, ebitda],
-        connector={"line": {"color": "rgb(63, 63, 63)"}}
-    ))
-    fig.update_layout(
-        title="Cuenta de Resultados - Gráfico Cascada",
-        plot_bgcolor=COLOR_FONDO,
-        paper_bgcolor=COLOR_FONDO,
-        font=dict(color=COLOR_TEXTO),
-        margin=dict(l=10, r=10, t=40, b=10)
-    )
-    st.plotly_chart(fig, use_container_width=True)
-
-# Mostrar KPIs y gráfico inicial
-actualizar_kpis()
-
-# -------------------------------
 # Bloque Costes Fijos - Ajustable
-# -------------------------------
-with st.expander("🏢 Ajustar Costes Fijos en Detalle", expanded=False):
+with st.expander("🏢 Ajustar Costes Fijos en Detalle", expanded=True):
     st.markdown("Ajusta cada partida para analizar su impacto en la rentabilidad.")
 
-    # Total costes fijos
-    costes_fijos_total = sum(costes_fijos_detalle.values())
-    costes_fijos_pct = costes_fijos_total / facturacion_default
-
-    # Mostrar total como KPI
-    kpi_card("Total Costes Fijos", costes_fijos_total, costes_fijos_pct, BENCHMARKS["Costes Fijos"],
-             tooltip="Suma de todos los costes fijos")
+    detalle_cols = st.columns(len(costes_fijos_detalle))
 
     # Sliders y KPIs por categoría
-    detalle_cols = st.columns(len(costes_fijos_detalle))
     for idx, (categoria, valor) in enumerate(costes_fijos_detalle.items()):
         with detalle_cols[idx]:
             porcentaje = valor / facturacion_default
@@ -175,15 +116,65 @@ with st.expander("🏢 Ajustar Costes Fijos en Detalle", expanded=False):
             kpi_card(categoria.capitalize(), valor, porcentaje, benchmark=benchmark_categoria,
                      tooltip=f"Coste fijo en {categoria}")
 
+            # Marca visual del valor original
+            st.markdown(f"<small style='color:{COLOR_TEXTO}'>Valor original: {format_euro(costes_fijos_original[categoria])}</small>",
+                        unsafe_allow_html=True)
+
             # Slider para ajuste
             nuevo_valor = st.slider(
-                f"Ajustar {categoria.capitalize()} (€) [Actual: {format_euro(valor)}]",
+                f"Ajustar {categoria.capitalize()} (€)",
                 min_value=0,
-                max_value=int(valor * 2),
+                max_value=int(costes_fijos_original[categoria] * 2),
                 value=int(valor),
                 step=1000
             )
             costes_fijos_detalle[categoria] = nuevo_valor
 
-    # Actualizar KPIs y gráfico en tiempo real
-    actualizar_kpis()
+# -------------------------------
+# Recalcular y mostrar KPIs y gráfico
+# -------------------------------
+costes_fijos_total = sum(costes_fijos_detalle.values())
+ebitda = margen_bruto_default - costes_fijos_total
+
+costes_directos_pct = costes_directos_default / facturacion_default
+margen_bruto_pct = margen_bruto_default / facturacion_default
+costes_fijos_pct = costes_fijos_total / facturacion_default
+ebitda_pct = ebitda / facturacion_default
+
+# KPIs principales
+col1, col2, col3, col4, col5 = st.columns(5)
+with col1:
+    kpi_card("Facturación Total", facturacion_default, 1.0, tooltip="Ingresos totales estimados")
+with col2:
+    kpi_card("Costes Directos", costes_directos_default, costes_directos_pct, BENCHMARKS["Costes Directos"],
+             tooltip="Costes asociados directamente a la producción de servicios")
+with col3:
+    kpi_card("Margen Bruto", margen_bruto_default, margen_bruto_pct, BENCHMARKS["Margen Bruto"],
+             tooltip="Ingresos menos costes directos")
+with col4:
+    kpi_card("Costes Fijos", costes_fijos_total, costes_fijos_pct, BENCHMARKS["Costes Fijos"],
+             tooltip="Suma de todos los costes fijos")
+with col5:
+    kpi_card("EBITDA", ebitda, ebitda_pct, BENCHMARKS["EBITDA"],
+             tooltip="Beneficio antes de intereses, impuestos, depreciaciones y amortizaciones")
+
+# Gráfico cascada
+fig = go.Figure(go.Waterfall(
+    name="PyG",
+    orientation="v",
+    measure=["relative", "relative", "relative", "total"],
+    x=["Ingresos", "Costes Directos", "Costes Fijos", "EBITDA"],
+    textposition="outside",
+    text=[format_euro(facturacion_default), format_euro(-costes_directos_default),
+          format_euro(-costes_fijos_total), format_euro(ebitda)],
+    y=[facturacion_default, -costes_directos_default, -costes_fijos_total, ebitda],
+    connector={"line": {"color": "rgb(63, 63, 63)"}}
+))
+fig.update_layout(
+    title="Cuenta de Resultados - Gráfico Cascada",
+    plot_bgcolor=COLOR_FONDO,
+    paper_bgcolor=COLOR_FONDO,
+    font=dict(color=COLOR_TEXTO),
+    margin=dict(l=10, r=10, t=40, b=10)
+)
+st.plotly_chart(fig, use_container_width=True)
