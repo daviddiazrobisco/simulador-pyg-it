@@ -91,12 +91,11 @@ st.sidebar.header("🔧 Ajustes Simulación")
 facturacion_default = int(result['facturacion_total'])
 
 facturacion = st.sidebar.slider(
-    'Facturación total (€)',
+    f'Facturación total (€) [Actual: {format_euro(facturacion_default)}]',
     min_value=0,
     max_value=10000000,
     value=facturacion_default,
-    step=50000,
-    format_func=lambda x: format_euro(x)
+    step=50000
 )
 
 # Ajustes individuales de costes fijos
@@ -104,13 +103,13 @@ st.sidebar.subheader("🔩 Ajuste Costes Fijos (detallado)")
 costes_fijos_detalle = {}
 for categoria, valor in param['costes_fijos'].items():
     costes_fijos_detalle[categoria] = st.sidebar.slider(
-        f"{categoria.capitalize()} (€)",
+        f"{categoria.capitalize()} (€) [Actual: {format_euro(valor)}]",
         min_value=0,
         max_value=int(valor * 2),
         value=int(valor),
-        step=1000,
-        format_func=lambda x: format_euro(x)
+        step=1000
     )
+
 
 # Recalcular total costes fijos
 costes_fijos = sum(costes_fijos_detalle.values())
