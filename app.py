@@ -28,7 +28,7 @@ BENCHMARKS = {
 }
 
 # -------------------------------
-# Formateo números europeos
+# Función formateo números europeos
 # -------------------------------
 def format_euro(valor):
     formatted = f"{int(valor):,}".replace(",", "X").replace(".", ",").replace("X", ".")
@@ -76,32 +76,18 @@ result = data['resultados']
 
 facturacion_default = int(result['facturacion_total'])
 costes_fijos_default = param['costes_fijos']
-costes_fijos_detalle = dict(costes_fijos_default)
 
 # -------------------------------
-# Sliders Costes Fijos
+# Inicializar session_state
 # -------------------------------
-with st.expander("🏢 Detalle de Costes Fijos", expanded=False):
-    st.markdown("Ajusta cada partida para analizar su impacto en la rentabilidad.")
-
-    detalle_cols = st.columns(len(costes_fijos_detalle))
-    for idx, categoria in enumerate(costes_fijos_detalle.keys()):
-        with detalle_cols[idx]:
-            slider_value = st.slider(
-                f"Ajustar {categoria.capitalize()} (€)",
-                min_value=0,
-                max_value=int(costes_fijos_default[categoria] * 2),
-                value=int(costes_fijos_detalle[categoria]),
-                step=1000,
-                format="%d"
-            )
-            costes_fijos_detalle[categoria] = slider_value
+if 'costes_fijos_detalle' not in st.session_state:
+    st.session_state.costes_fijos_detalle = dict(costes_fijos_default)
 
 # -------------------------------
-# Cálculos dinámicos
+# Función cálculos dinámicos
 # -------------------------------
 def calcular_pyg():
-    total_costes_fijos = sum(costes_fijos_detalle.values())
+    total_costes_fijos = sum(st.session_state.costes_fijos_detalle.values())
     costes_directos = facturacion_default * (result['costes_directos'] / result['facturacion_total'])
     margen_bruto = facturacion_default - costes_directos
     ebitda = margen_bruto - total_costes_fijos
@@ -119,22 +105,7 @@ def calcular_pyg():
 pyg = calcular_pyg()
 
 # -------------------------------
-# Layout KPIs Costes Fijos Actualizados
-# -------------------------------
-with st.expander("🏢 Detalle de Costes Fijos", expanded=False):
-    kpi_card("Total Costes Fijos", pyg['costes_fijos'], pyg['costes_fijos_pct'], BENCHMARKS["Costes Fijos"],
-             tooltip="Suma de todos los costes fijos")
-    detalle_cols = st.columns(len(costes_fijos_detalle))
-    for idx, (categoria, valor) in enumerate(costes_fijos_detalle.items()):
-        porcentaje = valor / facturacion_default
-        benchmark_categoria = BENCHMARKS.get(categoria.capitalize())
-        with detalle_cols[idx]:
-            kpi_card(categoria.capitalize(), valor, porcentaje,
-                     benchmark=benchmark_categoria,
-                     tooltip=f"Coste fijo en {categoria}")
-
-# -------------------------------
-# Layout KPIs - Visión General
+# KPIs principales arriba
 # -------------------------------
 st.title("💻 Simulador PyG Financiero para Empresa IT")
 st.markdown("Ajusta las variables clave y observa el impacto en tiempo real.")
@@ -177,3 +148,29 @@ fig.update_layout(
     margin=dict(l=10, r=10, t=40, b=10)
 )
 st.plotly_chart(fig, use_container_width=True)
+
+# -------------------------------
+# Bloque Costes Fijos
+# -------------------------------
+with st.expander("🏢 Detalle de Costes Fijos", expanded=False):
+    st.markdown("Ajusta cada partida para analizar su impacto en la rentabilidad.")
+
+    detalle_cols = st.columns(len(st.session_state.costes_fijos_detalle))
+    for idx, (categoria, valor) in enumerate(st.session_state.costes_fijos_detalle.items()):
+        porcentaje = valor / facturacion_default
+        benchmark_categoria = BENCHMARKS.get(categoria.capitalize())
+        with detalle_cols[idx]:
+            kpi_card(categoria.capitalize(), valor, porcentaje,
+                     benchmark=benchmark_categoria,
+                     tooltip=f"Coste fijo en {categoria}")
+
+            slider_value = st.slider(
+                f"Ajustar {categoria.capitalize()} (€)",
+                min_value=0,
+                max_value=int(costes_fijos_default[categoria] * 2),
+                value=int(valor),
+                step=1000,
+                format="%d",
+                key=f"slider_{categoria}"
+            )
+            st.session_state.costes_fijos_detalle[categoria] = slider_value
