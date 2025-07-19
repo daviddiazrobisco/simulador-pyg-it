@@ -15,21 +15,28 @@ COLOR_GRIS = "#F2F2F2"
 COLOR_TEXTO = "#333333"
 COLOR_FONDO = "#FFFFFF"
 
-# Benchmarks por KPI (ajusta con datos reales del informe)
+# Benchmarks por KPI global y por costes fijos (ajusta con datos reales)
 BENCHMARKS = {
     "Costes Directos": (0.50, 0.55),
     "Margen Bruto": (0.45, 0.50),
     "Costes Fijos": (0.15, 0.20),
     "EBITDA": (0.25, 0.30),
+    # Benchmarks por categoría de costes fijos
+    "Estructura": (0.05, 0.07),
+    "Alquiler": (0.02, 0.03),
+    "Marketing": (0.02, 0.04),
+    "Suministros": (0.01, 0.02),
+    "Software interno": (0.01, 0.03),
+    "Otros": (0.005, 0.01)
 }
 
 # -------------------------------
 # Función formateo números europeos
 # -------------------------------
 def format_euro(valor):
-    """Formatea número con puntos miles, coma decimales y €"""
-    formatted = f"{valor:,.0f} €".replace(",", "X").replace(".", ",").replace("X", ".")
-    return formatted
+    """Formatea número con puntos miles, sin decimales y €"""
+    formatted = f"{int(valor):,}".replace(",", "X").replace(".", ",").replace("X", ".")
+    return f"{formatted} €"
 
 def get_estado(valor_pct, benchmark):
     """Devuelve color e icono según benchmark"""
@@ -80,6 +87,7 @@ result = data['resultados']
 # Sidebar - Ajustes globales
 # -------------------------------
 st.sidebar.header("🔧 Ajustes Simulación")
+
 facturacion_default = int(result['facturacion_total'])
 
 facturacion = st.sidebar.slider(
@@ -87,7 +95,8 @@ facturacion = st.sidebar.slider(
     min_value=0,
     max_value=10000000,
     value=facturacion_default,
-    step=50000
+    step=50000,
+    format_func=lambda x: format_euro(x)
 )
 
 # Ajustes individuales de costes fijos
@@ -99,7 +108,8 @@ for categoria, valor in param['costes_fijos'].items():
         min_value=0,
         max_value=int(valor * 2),
         value=int(valor),
-        step=1000
+        step=1000,
+        format_func=lambda x: format_euro(x)
     )
 
 # Recalcular total costes fijos
@@ -181,6 +191,8 @@ with st.expander("🏢 Detalle de Costes Fijos", expanded=False):
     detalle_cols = st.columns(len(costes_fijos_detalle))
     for idx, (categoria, valor) in enumerate(costes_fijos_detalle.items()):
         porcentaje = valor / facturacion
+        benchmark_categoria = BENCHMARKS.get(categoria.capitalize())
         with detalle_cols[idx]:
             kpi_card(categoria.capitalize(), valor, porcentaje,
+                     benchmark=benchmark_categoria,
                      tooltip=f"Coste fijo en {categoria}")
