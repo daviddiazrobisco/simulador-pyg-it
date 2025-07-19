@@ -41,20 +41,24 @@ st.markdown("Ajusta las variables clave y observa el impacto en tiempo real.")
 
 # Sliders para ajustes globales
 st.sidebar.header("🔧 Ajustes Simulación")
+
+facturacion_default = int(result['facturacion_total'])
+costes_fijos_default = int(result['costes_fijos'])
+
 facturacion = st.sidebar.slider(
     'Facturación total (€)', 
     min_value=0, 
-    max_value=10_000_000, 
-    value=result['facturacion_total'], 
-    step=50_000
+    max_value=10000000,  # sin separador
+    value=facturacion_default if 0 <= facturacion_default <= 10000000 else 5000000,
+    step=50000
 )
 
 costes_fijos = st.sidebar.slider(
     'Costes fijos totales (€)', 
     min_value=0, 
-    max_value=2_000_000, 
-    value=result['costes_fijos'], 
-    step=50_000
+    max_value=2000000,  # sin separador
+    value=costes_fijos_default if 0 <= costes_fijos_default <= 2000000 else 500000,
+    step=50000
 )
 
 # Cálculos dinámicos
