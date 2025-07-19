@@ -81,7 +81,6 @@ result = data['resultados']
 # -------------------------------
 st.sidebar.header("🔧 Ajustes Simulación")
 facturacion_default = int(result['facturacion_total'])
-costes_fijos_default = int(result['costes_fijos'])
 
 facturacion = st.sidebar.slider(
     'Facturación total (€)',
@@ -91,10 +90,8 @@ facturacion = st.sidebar.slider(
     step=50000
 )
 
-# -------------------------------
 # Ajustes individuales de costes fijos
-# -------------------------------
-st.sidebar.subheader("🔩 Ajuste Costes Fijos")
+st.sidebar.subheader("🔩 Ajuste Costes Fijos (detallado)")
 costes_fijos_detalle = {}
 for categoria, valor in param['costes_fijos'].items():
     costes_fijos_detalle[categoria] = st.sidebar.slider(
@@ -171,12 +168,19 @@ fig.update_layout(
 st.plotly_chart(fig, use_container_width=True)
 
 # -------------------------------
-# Bloque Costes Fijos - Detalle
+# Bloque Costes Fijos - Plegable
 # -------------------------------
-st.header("🏢 Detalle de Costes Fijos")
-st.markdown("Ajusta cada partida para analizar su impacto en la rentabilidad.")
+with st.expander("🏢 Detalle de Costes Fijos", expanded=False):
+    st.markdown("Ajusta cada partida para analizar su impacto en la rentabilidad.")
+    
+    # Mostrar total costes fijos
+    kpi_card("Total Costes Fijos", costes_fijos, costes_fijos_pct, BENCHMARKS["Costes Fijos"],
+             tooltip="Suma de todos los costes fijos")
 
-costes_cols = st.columns(len(costes_fijos_detalle))
-for idx, (categoria, valor) in enumerate(costes_fijos_detalle.items()):
-    porcentaje = valor / facturacion
-    kpi_card(categoria.capitalize(), valor, porcentaje, tooltip=f"Coste fijo en {categoria}")
+    # Detalle categorías
+    detalle_cols = st.columns(len(costes_fijos_detalle))
+    for idx, (categoria, valor) in enumerate(costes_fijos_detalle.items()):
+        porcentaje = valor / facturacion
+        with detalle_cols[idx]:
+            kpi_card(categoria.capitalize(), valor, porcentaje,
+                     tooltip=f"Coste fijo en {categoria}")
