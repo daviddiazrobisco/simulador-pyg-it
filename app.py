@@ -15,12 +15,12 @@ COLOR_GRIS = "#F2F2F2"
 COLOR_TEXTO = "#333333"
 COLOR_FONDO = "#FFFFFF"
 
-# Benchmarks por KPI (ejemplo aproximado, ajusta con informe real)
+# Benchmarks por KPI (ajusta con datos reales del informe)
 BENCHMARKS = {
-    "Costes Directos": (0.50, 0.55),  # 50-55% sobre ventas
-    "Margen Bruto": (0.45, 0.50),     # 45-50% sobre ventas
-    "Costes Fijos": (0.15, 0.20),     # 15-20% sobre ventas
-    "EBITDA": (0.25, 0.30),           # 25-30% sobre ventas
+    "Costes Directos": (0.50, 0.55),
+    "Margen Bruto": (0.45, 0.50),
+    "Costes Fijos": (0.15, 0.20),
+    "EBITDA": (0.25, 0.30),
 }
 
 # -------------------------------
@@ -61,7 +61,7 @@ def kpi_card(nombre, valor_abs, valor_pct, benchmark=None, tooltip=None):
          onmouseout="this.style.transform='scale(1)'"
          title="{tooltip or nombre}">
         <div style="font-size:18px; color:{COLOR_TEXTO};">{nombre} {icono}</div>
-        <div style="font-size:28px; font-weight:bold; color:{color};">{format_euro(valor_abs)}</div>
+        <div style="font-size:26px; font-weight:bold; color:{color};">{format_euro(valor_abs)}</div>
         <div style="font-size:14px; color:{COLOR_TEXTO};">{round(valor_pct*100, 1)}% sobre ventas{comparativa}</div>
     </div>
     """
@@ -91,13 +91,22 @@ facturacion = st.sidebar.slider(
     step=50000
 )
 
-costes_fijos = st.sidebar.slider(
-    'Costes fijos totales (€)',
-    min_value=0,
-    max_value=2000000,
-    value=costes_fijos_default,
-    step=50000
-)
+# -------------------------------
+# Ajustes individuales de costes fijos
+# -------------------------------
+st.sidebar.subheader("🔩 Ajuste Costes Fijos")
+costes_fijos_detalle = {}
+for categoria, valor in param['costes_fijos'].items():
+    costes_fijos_detalle[categoria] = st.sidebar.slider(
+        f"{categoria.capitalize()} (€)",
+        min_value=0,
+        max_value=int(valor * 2),
+        value=int(valor),
+        step=1000
+    )
+
+# Recalcular total costes fijos
+costes_fijos = sum(costes_fijos_detalle.values())
 
 # -------------------------------
 # Cálculos dinámicos
@@ -112,7 +121,7 @@ costes_fijos_pct = costes_fijos / facturacion
 ebitda_pct = ebitda / facturacion
 
 # -------------------------------
-# Layout KPIs - Responsive fila única
+# Layout KPIs - Visión General
 # -------------------------------
 st.title("💻 Simulador PyG Financiero para Empresa IT")
 st.markdown("Ajusta las variables clave y observa el impacto en tiempo real.")
@@ -123,19 +132,19 @@ with col1:
     kpi_card("Facturación Total", facturacion, 1.0, tooltip="Ingresos totales estimados")
 
 with col2:
-    kpi_card("Costes Directos", costes_directos, costes_directos_pct, BENCHMARKS["Costes Directos"], 
+    kpi_card("Costes Directos", costes_directos, costes_directos_pct, BENCHMARKS["Costes Directos"],
              tooltip="Costes asociados directamente a la producción de servicios")
 
 with col3:
-    kpi_card("Margen Bruto", margen_bruto, margen_bruto_pct, BENCHMARKS["Margen Bruto"], 
+    kpi_card("Margen Bruto", margen_bruto, margen_bruto_pct, BENCHMARKS["Margen Bruto"],
              tooltip="Ingresos menos costes directos")
 
 with col4:
-    kpi_card("Costes Fijos", costes_fijos, costes_fijos_pct, BENCHMARKS["Costes Fijos"], 
+    kpi_card("Costes Fijos", costes_fijos, costes_fijos_pct, BENCHMARKS["Costes Fijos"],
              tooltip="Costes de estructura y operativos")
 
 with col5:
-    kpi_card("EBITDA", ebitda, ebitda_pct, BENCHMARKS["EBITDA"], 
+    kpi_card("EBITDA", ebitda, ebitda_pct, BENCHMARKS["EBITDA"],
              tooltip="Beneficio antes de intereses, impuestos, depreciaciones y amortizaciones")
 
 # -------------------------------
@@ -160,3 +169,14 @@ fig.update_layout(
     margin=dict(l=10, r=10, t=40, b=10)
 )
 st.plotly_chart(fig, use_container_width=True)
+
+# -------------------------------
+# Bloque Costes Fijos - Detalle
+# -------------------------------
+st.header("🏢 Detalle de Costes Fijos")
+st.markdown("Ajusta cada partida para analizar su impacto en la rentabilidad.")
+
+costes_cols = st.columns(len(costes_fijos_detalle))
+for idx, (categoria, valor) in enumerate(costes_fijos_detalle.items()):
+    porcentaje = valor / facturacion
+    kpi_card(categoria.capitalize(), valor, porcentaje, tooltip=f"Coste fijo en {categoria}")
