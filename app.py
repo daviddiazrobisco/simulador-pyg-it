@@ -37,18 +37,9 @@ def kpi_card(title, value, porcentaje, benchmark, estado):
         color_valor = rojo
         icono = "❌"
 
-    # HTML tarjeta mejorado con número y € juntos
+    # HTML tarjeta responsive
     st.markdown(f"""
-        <div style="
-            background-color:{gris_claro};
-            padding:15px;
-            border-radius:10px;
-            text-align:center;
-            min-height:150px;
-            display:flex;
-            flex-direction:column;
-            justify-content:center;
-        ">
+        <div class="kpi-card">
             <h4 style="color:{gris_oscuro}; margin-bottom:8px;">{title}</h4>
             <p style="font-size:clamp(20px, 3vw, 32px); color:{color_valor}; margin:0; font-weight:bold;">
                 {format_euro(value)}
@@ -58,6 +49,27 @@ def kpi_card(title, value, porcentaje, benchmark, estado):
         </div>
     """, unsafe_allow_html=True)
 
+# Estilos CSS para layout responsive
+st.markdown(f"""
+    <style>
+        .kpi-grid {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px;
+            margin-top: 20px;
+        }}
+        .kpi-card {{
+            background-color:{gris_claro};
+            padding:15px;
+            border-radius:10px;
+            text-align:center;
+            min-height:150px;
+            display:flex;
+            flex-direction:column;
+            justify-content:center;
+        }}
+    </style>
+""", unsafe_allow_html=True)
 
 # Sidebar ajustes
 st.sidebar.header("🔧 Ajustes Simulación")
@@ -118,18 +130,14 @@ estado_ebitda = get_estado(pct_ebitda, benchmarks["EBITDA"])
 st.title("💻 Simulador PyG Financiero para Empresa IT")
 st.markdown("Ajusta las variables clave y observa el impacto en tiempo real.")
 
-# Mostrar tarjetas KPI en fila
-col1, col2, col3, col4, col5 = st.columns(5)
-with col1:
-    kpi_card("Facturación Total", facturacion, 100, "-", "ok")
-with col2:
-    kpi_card("Costes Directos", costes_directos, pct_costes_directos, "50–55%", estado_costes_directos)
-with col3:
-    kpi_card("Margen Bruto", margen_bruto, pct_margen_bruto, "45–50%", estado_margen_bruto)
-with col4:
-    kpi_card("Costes Fijos", costes_fijos, pct_costes_fijos, "15–20%", estado_costes_fijos)
-with col5:
-    kpi_card("EBITDA", ebitda, pct_ebitda, "25–30%", estado_ebitda)
+# Mostrar tarjetas KPI en grid responsive
+st.markdown('<div class="kpi-grid">', unsafe_allow_html=True)
+kpi_card("Facturación Total", facturacion, 100, "-", "ok")
+kpi_card("Costes Directos", costes_directos, pct_costes_directos, "50–55%", estado_costes_directos)
+kpi_card("Margen Bruto", margen_bruto, pct_margen_bruto, "45–50%", estado_margen_bruto)
+kpi_card("Costes Fijos", costes_fijos, pct_costes_fijos, "15–20%", estado_costes_fijos)
+kpi_card("EBITDA", ebitda, pct_ebitda, "25–30%", estado_ebitda)
+st.markdown('</div>', unsafe_allow_html=True)
 
 # Gráfico cascada
 fig = go.Figure(go.Waterfall(
