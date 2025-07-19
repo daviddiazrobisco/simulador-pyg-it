@@ -2,167 +2,161 @@ import streamlit as st
 import json
 import plotly.graph_objects as go
 
+# -------------------------------
 # Configuración general
+# -------------------------------
 st.set_page_config(page_title="Simulador PyG IT", page_icon="💻", layout="wide")
 
+# Colores corporativos
+COLOR_VERDE = "#144C44"
+COLOR_NARANJA = "#fb9200"
+COLOR_ROJO = "#D33F49"
+COLOR_GRIS = "#F2F2F2"
+COLOR_TEXTO = "#333333"
+COLOR_FONDO = "#FFFFFF"
+
+# Benchmarks por KPI (ejemplo aproximado, ajusta con informe real)
+BENCHMARKS = {
+    "Costes Directos": (0.50, 0.55),  # 50-55% sobre ventas
+    "Margen Bruto": (0.45, 0.50),     # 45-50% sobre ventas
+    "Costes Fijos": (0.15, 0.20),     # 15-20% sobre ventas
+    "EBITDA": (0.25, 0.30),           # 25-30% sobre ventas
+}
+
+# -------------------------------
+# Función formateo números europeos
+# -------------------------------
+def format_euro(valor):
+    """Formatea número con puntos miles, coma decimales y €"""
+    formatted = f"{valor:,.0f} €".replace(",", "X").replace(".", ",").replace("X", ".")
+    return formatted
+
+def get_estado(valor_pct, benchmark):
+    """Devuelve color e icono según benchmark"""
+    min_bm, max_bm = benchmark
+    if min_bm <= valor_pct <= max_bm:
+        return COLOR_VERDE, "✅"
+    elif valor_pct < min_bm:
+        return COLOR_ROJO, "❌"
+    else:
+        return COLOR_NARANJA, "⚠️"
+
+# -------------------------------
+# Componente KPI reutilizable
+# -------------------------------
+def kpi_card(nombre, valor_abs, valor_pct, benchmark=None, tooltip=None):
+    """Genera una tarjeta KPI con color dinámico y popup"""
+    color, icono = COLOR_VERDE, "✅"
+    comparativa = ""
+    if benchmark:
+        color, icono = get_estado(valor_pct, benchmark)
+        comparativa = f"<br><small>Benchmark: {int(benchmark[0]*100)}–{int(benchmark[1]*100)}%</small>"
+
+    html = f"""
+    <div class="kpi-card" style="background-color:{COLOR_GRIS}; 
+                                  border-left:5px solid {color};
+                                  padding:10px; border-radius:8px;
+                                  transition: transform 0.2s; position:relative;"
+         onmouseover="this.style.transform='scale(1.02)'"
+         onmouseout="this.style.transform='scale(1)'"
+         title="{tooltip or nombre}">
+        <div style="font-size:18px; color:{COLOR_TEXTO};">{nombre} {icono}</div>
+        <div style="font-size:28px; font-weight:bold; color:{color};">{format_euro(valor_abs)}</div>
+        <div style="font-size:14px; color:{COLOR_TEXTO};">{round(valor_pct*100, 1)}% sobre ventas{comparativa}</div>
+    </div>
+    """
+    st.markdown(html, unsafe_allow_html=True)
+
+# -------------------------------
 # Cargar datos desde JSON
+# -------------------------------
 with open('presupuesto_it_2025.json') as f:
     data = json.load(f)
 
 param = data['parametros']
 result = data['resultados']
 
-# Paleta corporativa
-verde_oscuro = "#144C44"
-naranja = "#fb9200"
-rojo = "#FF4B4B"
-gris_claro = "#F2F2F2"
-gris_oscuro = "#333333"
-blanco = "#FFFFFF"
-
-# Función formato europeo
-def format_euro(valor):
-    return f"{valor:,.0f} €".replace(",", "X").replace(".", ",").replace("X", ".")
-
-# Función KPI Card reutilizable
-def kpi_card(title, value, porcentaje, benchmark, estado):
-    # Color según estado
-    if estado == "ok":
-        color_valor = verde_oscuro
-        icono = "✅"
-    elif estado == "warning":
-        color_valor = naranja
-        icono = "⚠️"
-    else:
-        color_valor = rojo
-        icono = "❌"
-
-    # HTML tarjeta con animación hover
-    st.markdown(f"""
-        <div class="kpi-card">
-            <h4 style="color:{gris_oscuro}; margin-bottom:8px;">{title}</h4>
-            <p style="font-size:2rem; color:{color_valor}; margin:0; font-weight:bold;">
-                {format_euro(value)}
-            </p>
-            <p style="font-size:14px; color:{gris_oscuro}; margin:3px 0 0 0;">📊 {porcentaje:.1f}% sobre ventas</p>
-            <p style="font-size:13px; color:#666666; margin:0;">📈 Benchmark: {benchmark} {icono}</p>
-        </div>
-    """, unsafe_allow_html=True)
-
-# Estilos CSS: fila única + animación hover
-st.markdown(f"""
-    <style>
-        .kpi-row {{
-            display: flex;
-            flex-wrap: nowrap;
-            overflow-x: auto;
-            gap: 16px;
-            padding-bottom: 10px;
-        }}
-        .kpi-card {{
-            background-color:{gris_claro};
-            padding:15px;
-            border-radius:10px;
-            text-align:center;
-            min-width:220px;
-            flex: 1;
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
-        }}
-        .kpi-card:hover {{
-            transform: scale(1.03);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        }}
-        @media (max-width: 768px) {{
-            .kpi-card {{
-                min-width: 250px;
-            }}
-        }}
-    </style>
-""", unsafe_allow_html=True)
-
-# Sidebar ajustes
+# -------------------------------
+# Sidebar - Ajustes globales
+# -------------------------------
 st.sidebar.header("🔧 Ajustes Simulación")
-
 facturacion_default = int(result['facturacion_total'])
 costes_fijos_default = int(result['costes_fijos'])
 
 facturacion = st.sidebar.slider(
-    'Facturación total (€)', 
-    min_value=0, 
-    max_value=10000000, 
-    value=facturacion_default if 0 <= facturacion_default <= 10000000 else 5000000,
+    'Facturación total (€)',
+    min_value=0,
+    max_value=10000000,
+    value=facturacion_default,
     step=50000
 )
 
 costes_fijos = st.sidebar.slider(
-    'Costes fijos totales (€)', 
-    min_value=0, 
-    max_value=2000000, 
-    value=costes_fijos_default if 0 <= costes_fijos_default <= 2000000 else 500000,
+    'Costes fijos totales (€)',
+    min_value=0,
+    max_value=2000000,
+    value=costes_fijos_default,
     step=50000
 )
 
+# -------------------------------
 # Cálculos dinámicos
+# -------------------------------
 costes_directos = facturacion * (result['costes_directos'] / result['facturacion_total'])
 margen_bruto = facturacion - costes_directos
 ebitda = margen_bruto - costes_fijos
 
-# Benchmarks para comparativa
-benchmarks = {
-    "Costes Directos": (50, 55),
-    "Margen Bruto": (45, 50),
-    "Costes Fijos": (15, 20),
-    "EBITDA": (25, 30)
-}
+costes_directos_pct = costes_directos / facturacion
+margen_bruto_pct = margen_bruto / facturacion
+costes_fijos_pct = costes_fijos / facturacion
+ebitda_pct = ebitda / facturacion
 
-# Calcula % sobre ventas
-pct_costes_directos = (costes_directos / facturacion) * 100 if facturacion else 0
-pct_margen_bruto = (margen_bruto / facturacion) * 100 if facturacion else 0
-pct_costes_fijos = (costes_fijos / facturacion) * 100 if facturacion else 0
-pct_ebitda = (ebitda / facturacion) * 100 if facturacion else 0
-
-# Compara con benchmark
-def get_estado(valor, rango):
-    if rango[0] <= valor <= rango[1]:
-        return "ok"
-    elif (valor < rango[0] and valor >= rango[0] - 5) or (valor > rango[1] and valor <= rango[1] + 5):
-        return "warning"
-    else:
-        return "error"
-
-estado_costes_directos = get_estado(pct_costes_directos, benchmarks["Costes Directos"])
-estado_margen_bruto = get_estado(pct_margen_bruto, benchmarks["Margen Bruto"])
-estado_costes_fijos = get_estado(pct_costes_fijos, benchmarks["Costes Fijos"])
-estado_ebitda = get_estado(pct_ebitda, benchmarks["EBITDA"])
-
-# Título principal
+# -------------------------------
+# Layout KPIs - Responsive fila única
+# -------------------------------
 st.title("💻 Simulador PyG Financiero para Empresa IT")
 st.markdown("Ajusta las variables clave y observa el impacto en tiempo real.")
 
-# Mostrar tarjetas KPI en fila única con scroll en móvil
-st.markdown('<div class="kpi-row">', unsafe_allow_html=True)
-kpi_card("Facturación Total", facturacion, 100, "-", "ok")
-kpi_card("Costes Directos", costes_directos, pct_costes_directos, "50–55%", estado_costes_directos)
-kpi_card("Margen Bruto", margen_bruto, pct_margen_bruto, "45–50%", estado_margen_bruto)
-kpi_card("Costes Fijos", costes_fijos, pct_costes_fijos, "15–20%", estado_costes_fijos)
-kpi_card("EBITDA", ebitda, pct_ebitda, "25–30%", estado_ebitda)
-st.markdown('</div>', unsafe_allow_html=True)
+col1, col2, col3, col4, col5 = st.columns(5)
 
+with col1:
+    kpi_card("Facturación Total", facturacion, 1.0, tooltip="Ingresos totales estimados")
+
+with col2:
+    kpi_card("Costes Directos", costes_directos, costes_directos_pct, BENCHMARKS["Costes Directos"], 
+             tooltip="Costes asociados directamente a la producción de servicios")
+
+with col3:
+    kpi_card("Margen Bruto", margen_bruto, margen_bruto_pct, BENCHMARKS["Margen Bruto"], 
+             tooltip="Ingresos menos costes directos")
+
+with col4:
+    kpi_card("Costes Fijos", costes_fijos, costes_fijos_pct, BENCHMARKS["Costes Fijos"], 
+             tooltip="Costes de estructura y operativos")
+
+with col5:
+    kpi_card("EBITDA", ebitda, ebitda_pct, BENCHMARKS["EBITDA"], 
+             tooltip="Beneficio antes de intereses, impuestos, depreciaciones y amortizaciones")
+
+# -------------------------------
 # Gráfico cascada
+# -------------------------------
 fig = go.Figure(go.Waterfall(
     name="PyG",
     orientation="v",
     measure=["relative", "relative", "relative", "total"],
     x=["Ingresos", "Costes Directos", "Costes Fijos", "EBITDA"],
     textposition="outside",
-    text=[format_euro(facturacion), format_euro(-costes_directos), format_euro(-costes_fijos), format_euro(ebitda)],
+    text=[format_euro(facturacion), format_euro(-costes_directos),
+          format_euro(-costes_fijos), format_euro(ebitda)],
     y=[facturacion, -costes_directos, -costes_fijos, ebitda],
     connector={"line": {"color": "rgb(63, 63, 63)"}}
 ))
 fig.update_layout(
     title="Cuenta de Resultados - Gráfico Cascada",
-    plot_bgcolor=blanco,
-    paper_bgcolor=blanco,
-    font=dict(color=gris_oscuro)
+    plot_bgcolor=COLOR_FONDO,
+    paper_bgcolor=COLOR_FONDO,
+    font=dict(color=COLOR_TEXTO),
+    margin=dict(l=10, r=10, t=40, b=10)
 )
 st.plotly_chart(fig, use_container_width=True)
