@@ -15,7 +15,7 @@ COLOR_GRIS = "#F2F2F2"
 COLOR_TEXTO = "#333333"
 COLOR_FONDO = "#FFFFFF"
 
-# Benchmarks por KPI global y por costes fijos
+# Benchmarks por KPI global y por costes fijos (ajusta con datos reales)
 BENCHMARKS = {
     "Costes Directos": (0.50, 0.55),
     "Margen Bruto": (0.45, 0.50),
@@ -84,24 +84,25 @@ param = data['parametros']
 result = data['resultados']
 
 # -------------------------------
-# Ajustes fijos iniciales
+# Variables principales
 # -------------------------------
-facturacion = int(result['facturacion_total'])
-costes_directos = facturacion * (result['costes_directos'] / result['facturacion_total'])
+facturacion_default = int(result['facturacion_total'])
+costes_fijos_default = param['costes_fijos']
 
 # -------------------------------
-# Cálculo costes fijos detallados (sliders dentro del bloque)
+# Cálculos dinámicos iniciales
 # -------------------------------
-st.title("💻 Simulador PyG Financiero para Empresa IT")
-st.markdown("Ajusta las variables clave y observa el impacto en tiempo real.")
+facturacion = facturacion_default
 
-# Bloque Costes Fijos - Plegable
+# -------------------------------
+# Costes Fijos Detalle - Bloque interactivo
+# -------------------------------
 with st.expander("🏢 Detalle de Costes Fijos", expanded=False):
     st.markdown("Ajusta cada partida para analizar su impacto en la rentabilidad.")
     
     costes_fijos_detalle = {}
-    for categoria, valor in param['costes_fijos'].items():
-        slider_valor = st.slider(
+    for categoria, valor in costes_fijos_default.items():
+        slider_value = st.slider(
             f"{categoria.capitalize()} (€)",
             min_value=0,
             max_value=int(valor * 2),
@@ -109,17 +110,17 @@ with st.expander("🏢 Detalle de Costes Fijos", expanded=False):
             step=1000,
             format="%d"
         )
-        costes_fijos_detalle[categoria] = slider_valor
+        costes_fijos_detalle[categoria] = slider_value
 
     # Recalcular total costes fijos
     costes_fijos = sum(costes_fijos_detalle.values())
     costes_fijos_pct = costes_fijos / facturacion
 
-    # Tarjeta KPI total costes fijos
+    # KPI Total Costes Fijos
     kpi_card("Total Costes Fijos", costes_fijos, costes_fijos_pct, BENCHMARKS["Costes Fijos"],
              tooltip="Suma de todos los costes fijos")
 
-    # Tarjetas KPI detalle categorías
+    # KPI por categoría con slider
     detalle_cols = st.columns(len(costes_fijos_detalle))
     for idx, (categoria, valor) in enumerate(costes_fijos_detalle.items()):
         porcentaje = valor / facturacion
@@ -130,8 +131,9 @@ with st.expander("🏢 Detalle de Costes Fijos", expanded=False):
                      tooltip=f"Coste fijo en {categoria}")
 
 # -------------------------------
-# Cálculos dinámicos y KPIs principales
+# Cálculos dinámicos PyG
 # -------------------------------
+costes_directos = facturacion * (result['costes_directos'] / result['facturacion_total'])
 margen_bruto = facturacion - costes_directos
 ebitda = margen_bruto - costes_fijos
 
@@ -139,7 +141,12 @@ costes_directos_pct = costes_directos / facturacion
 margen_bruto_pct = margen_bruto / facturacion
 ebitda_pct = ebitda / facturacion
 
-# Layout KPIs principales
+# -------------------------------
+# Layout KPIs - Visión General
+# -------------------------------
+st.title("💻 Simulador PyG Financiero para Empresa IT")
+st.markdown("Ajusta las variables clave y observa el impacto en tiempo real.")
+
 col1, col2, col3, col4, col5 = st.columns(5)
 
 with col1:
