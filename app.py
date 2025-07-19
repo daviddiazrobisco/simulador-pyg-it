@@ -50,13 +50,10 @@ def get_estado(valor_pct, benchmark):
 # -------------------------------
 def kpi_card_slider(nombre, valor, facturacion, benchmark=None, tooltip=None, max_valor=None):
     porcentaje = valor / facturacion
-    color, icono = COLOR_VERDE, "✅"
-    comparativa = ""
-    if benchmark:
-        color, icono = get_estado(porcentaje, benchmark)
-        comparativa = f"<br><small>Benchmark: {int(benchmark[0]*100)}–{int(benchmark[1]*100)}%</small>"
+    color, icono = get_estado(porcentaje, benchmark) if benchmark else (COLOR_VERDE, "✅")
+    comparativa = f"<br><small>Benchmark: {int(benchmark[0]*100)}–{int(benchmark[1]*100)}%</small>" if benchmark else ""
 
-    # Slider integrado
+    # Slider integrado visualmente
     nuevo_valor = st.slider(
         f"Ajustar {nombre} (€)", 
         min_value=0,
@@ -69,13 +66,15 @@ def kpi_card_slider(nombre, valor, facturacion, benchmark=None, tooltip=None, ma
 
     html = f"""
     <div style="background-color:{COLOR_GRIS}; border-left:5px solid {color};
-                padding:10px; border-radius:8px; transition: transform 0.2s; margin-bottom:10px;"
+                padding:10px; border-radius:8px; transition: transform 0.2s; 
+                display:flex; flex-direction:column; align-items:center;
+                justify-content:space-between; min-height:220px;"
          onmouseover="this.style.transform='scale(1.02)'"
          onmouseout="this.style.transform='scale(1)'"
          title="{tooltip or nombre}">
-        <div style="font-size:18px; color:{COLOR_TEXTO};">{nombre} {icono}</div>
-        <div style="font-size:26px; font-weight:bold; color:{color};">{format_euro(nuevo_valor)}</div>
-        <div style="font-size:14px; color:{COLOR_TEXTO};">{round(porcentaje*100,1)}% sobre ventas{comparativa}</div>
+        <div style="font-size:18px; color:{COLOR_TEXTO}; margin-bottom:5px;">{nombre} {icono}</div>
+        <div style="font-size:26px; font-weight:bold; color:{color}; margin-bottom:5px;">{format_euro(nuevo_valor)}</div>
+        <div style="font-size:14px; color:{COLOR_TEXTO}; margin-bottom:10px;">{round(porcentaje*100,1)}% sobre ventas{comparativa}</div>
     </div>
     """
     st.markdown(html, unsafe_allow_html=True)
@@ -94,7 +93,7 @@ result = data['resultados']
 facturacion_default = int(result['facturacion_total'])
 costes_fijos_default = param['costes_fijos']
 
-# Inicializar session_state si no existe
+# Inicializar session_state
 if "costes_fijos_detalle" not in st.session_state:
     st.session_state.costes_fijos_detalle = dict(costes_fijos_default)
 
@@ -118,28 +117,15 @@ def calcular_pyg():
         "ebitda_pct": ebitda / facturacion_default
     }
 
-# Actualizar valores con sliders
-for categoria, valor_default in costes_fijos_default.items():
-    nuevo_valor = kpi_card_slider(
-        nombre=categoria.capitalize(),
-        valor=st.session_state.costes_fijos_detalle[categoria],
-        facturacion=facturacion_default,
-        benchmark=BENCHMARKS.get(categoria.capitalize()),
-        max_valor=int(valor_default * 2)
-    )
-    st.session_state.costes_fijos_detalle[categoria] = nuevo_valor
-
-# Calcular PyG
+# -------------------------------
+# Layout KPIs principales
+# -------------------------------
 pyg = calcular_pyg()
 
-# -------------------------------
-# Layout KPIs - Visión General
-# -------------------------------
 st.title("💻 Simulador PyG Financiero para Empresa IT")
 st.markdown("Ajusta las variables clave y observa el impacto en tiempo real.")
 
 col1, col2, col3, col4, col5 = st.columns(5)
-
 with col1:
     kpi_card_slider("Facturación Total", facturacion_default, facturacion_default, tooltip="Ingresos totales estimados")
 with col2:
@@ -173,3 +159,19 @@ fig.update_layout(
     margin=dict(l=10, r=10, t=40, b=10)
 )
 st.plotly_chart(fig, use_container_width=True)
+
+# -------------------------------
+# Bloque Costes Fijos (tarjetas en línea)
+# -------------------------------
+st.markdown("### 🏢 Detalle de Costes Fijos")
+detalle_cols = st.columns(len(costes_fijos_default))
+for idx, (categoria, valor_default) in enumerate(costes_fijos_default.items()):
+    with detalle_cols[idx]:
+        nuevo_valor = kpi_card_slider(
+            nombre=categoria.capitalize(),
+            valor=st.session_state.costes_fijos_detalle[categoria],
+            facturacion=facturacion_default,
+            benchmark=BENCHMARKS.get(categoria.capitalize()),
+            max_valor=valor_default * 2
+        )
+        st.session_state.costes_fijos_detalle[categoria] = nuevo_valor
