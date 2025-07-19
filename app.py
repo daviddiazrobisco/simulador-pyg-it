@@ -46,14 +46,27 @@ def get_estado(valor_pct, benchmark):
         return COLOR_NARANJA, "⚠️"
 
 # -------------------------------
-# Componente KPI reutilizable
+# Componente KPI con slider integrado
 # -------------------------------
-def kpi_card(nombre, valor_abs, valor_pct, benchmark=None, tooltip=None):
+def kpi_card_slider(nombre, valor, facturacion, benchmark=None, tooltip=None, max_valor=None):
+    porcentaje = valor / facturacion
     color, icono = COLOR_VERDE, "✅"
     comparativa = ""
     if benchmark:
-        color, icono = get_estado(valor_pct, benchmark)
+        color, icono = get_estado(porcentaje, benchmark)
         comparativa = f"<br><small>Benchmark: {int(benchmark[0]*100)}–{int(benchmark[1]*100)}%</small>"
+
+    # Slider integrado
+    nuevo_valor = st.slider(
+        f"Ajustar {nombre} (€)", 
+        min_value=0,
+        max_value=int(max_valor or valor*2),
+        value=int(valor),
+        step=1000,
+        format="%d",
+        key=f"slider_{nombre}"
+    )
+
     html = f"""
     <div style="background-color:{COLOR_GRIS}; border-left:5px solid {color};
                 padding:10px; border-radius:8px; transition: transform 0.2s; margin-bottom:10px;"
@@ -61,11 +74,12 @@ def kpi_card(nombre, valor_abs, valor_pct, benchmark=None, tooltip=None):
          onmouseout="this.style.transform='scale(1)'"
          title="{tooltip or nombre}">
         <div style="font-size:18px; color:{COLOR_TEXTO};">{nombre} {icono}</div>
-        <div style="font-size:26px; font-weight:bold; color:{color};">{format_euro(valor_abs)}</div>
-        <div style="font-size:14px; color:{COLOR_TEXTO};">{round(valor_pct*100,1)}% sobre ventas{comparativa}</div>
+        <div style="font-size:26px; font-weight:bold; color:{color};">{format_euro(nuevo_valor)}</div>
+        <div style="font-size:14px; color:{COLOR_TEXTO};">{round(porcentaje*100,1)}% sobre ventas{comparativa}</div>
     </div>
     """
     st.markdown(html, unsafe_allow_html=True)
+    return nuevo_valor
 
 # -------------------------------
 # Cargar datos desde JSON
@@ -104,6 +118,18 @@ def calcular_pyg():
         "ebitda_pct": ebitda / facturacion_default
     }
 
+# Actualizar valores con sliders
+for categoria, valor_default in costes_fijos_default.items():
+    nuevo_valor = kpi_card_slider(
+        nombre=categoria.capitalize(),
+        valor=st.session_state.costes_fijos_detalle[categoria],
+        facturacion=facturacion_default,
+        benchmark=BENCHMARKS.get(categoria.capitalize()),
+        max_valor=int(valor_default * 2)
+    )
+    st.session_state.costes_fijos_detalle[categoria] = nuevo_valor
+
+# Calcular PyG
 pyg = calcular_pyg()
 
 # -------------------------------
@@ -115,19 +141,15 @@ st.markdown("Ajusta las variables clave y observa el impacto en tiempo real.")
 col1, col2, col3, col4, col5 = st.columns(5)
 
 with col1:
-    kpi_card("Facturación Total", facturacion_default, 1.0, tooltip="Ingresos totales estimados")
+    kpi_card_slider("Facturación Total", facturacion_default, facturacion_default, tooltip="Ingresos totales estimados")
 with col2:
-    kpi_card("Costes Directos", pyg['costes_directos'], pyg['costes_directos_pct'], BENCHMARKS["Costes Directos"],
-             tooltip="Costes asociados a la producción de servicios")
+    kpi_card_slider("Costes Directos", pyg['costes_directos'], facturacion_default, BENCHMARKS["Costes Directos"])
 with col3:
-    kpi_card("Margen Bruto", pyg['margen_bruto'], pyg['margen_bruto_pct'], BENCHMARKS["Margen Bruto"],
-             tooltip="Ingresos menos costes directos")
+    kpi_card_slider("Margen Bruto", pyg['margen_bruto'], facturacion_default, BENCHMARKS["Margen Bruto"])
 with col4:
-    kpi_card("Costes Fijos", pyg['costes_fijos'], pyg['costes_fijos_pct'], BENCHMARKS["Costes Fijos"],
-             tooltip="Costes de estructura y operativos")
+    kpi_card_slider("Costes Fijos", pyg['costes_fijos'], facturacion_default, BENCHMARKS["Costes Fijos"])
 with col5:
-    kpi_card("EBITDA", pyg['ebitda'], pyg['ebitda_pct'], BENCHMARKS["EBITDA"],
-             tooltip="Beneficio antes de intereses, impuestos, depreciaciones y amortizaciones")
+    kpi_card_slider("EBITDA", pyg['ebitda'], facturacion_default, BENCHMARKS["EBITDA"])
 
 # -------------------------------
 # Gráfico cascada
@@ -151,37 +173,3 @@ fig.update_layout(
     margin=dict(l=10, r=10, t=40, b=10)
 )
 st.plotly_chart(fig, use_container_width=True)
-
-# -------------------------------
-# Bloque Costes Fijos
-# -------------------------------
-with st.expander("🏢 Detalle de Costes Fijos", expanded=False):
-    st.markdown("Ajusta cada partida para analizar su impacto en la rentabilidad.")
-
-    detalle_cols = st.columns(len(costes_fijos_default))
-    for idx, (categoria, valor_default) in enumerate(costes_fijos_default.items()):
-        # Slider y actualización directa en session_state
-        slider_value = st.slider(
-            f"Ajustar {categoria.capitalize()} (€)",
-            min_value=0,
-            max_value=int(valor_default * 2),
-            value=int(st.session_state.costes_fijos_detalle.get(categoria, valor_default)),
-            step=1000,
-            format="%d",
-            key=f"slider_{categoria}"
-        )
-        st.session_state.costes_fijos_detalle[categoria] = slider_value
-
-    # Total Costes Fijos actualizado
-    kpi_card("Total Costes Fijos", pyg['costes_fijos'], pyg['costes_fijos_pct'], BENCHMARKS["Costes Fijos"],
-             tooltip="Suma de todos los costes fijos")
-
-    # KPIs por categoría
-    detalle_cols = st.columns(len(st.session_state.costes_fijos_detalle))
-    for idx, (categoria, valor) in enumerate(st.session_state.costes_fijos_detalle.items()):
-        porcentaje = valor / facturacion_default
-        benchmark_categoria = BENCHMARKS.get(categoria.capitalize())
-        with detalle_cols[idx]:
-            kpi_card(categoria.capitalize(), valor, porcentaje,
-                     benchmark=benchmark_categoria,
-                     tooltip=f"Coste fijo en {categoria}")
