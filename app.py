@@ -87,7 +87,7 @@ if 'costes_fijos_detalle' not in st.session_state:
 # Callback para sliders
 # -------------------------------
 def on_slider_change():
-    st.experimental_rerun()
+    st.rerun()
 
 # -------------------------------
 # Función cálculos dinámicos
