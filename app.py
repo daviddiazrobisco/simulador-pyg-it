@@ -84,6 +84,12 @@ if 'costes_fijos_detalle' not in st.session_state:
     st.session_state.costes_fijos_detalle = dict(costes_fijos_default)
 
 # -------------------------------
+# Callback para sliders
+# -------------------------------
+def on_slider_change():
+    st.experimental_rerun()
+
+# -------------------------------
 # Función cálculos dinámicos
 # -------------------------------
 def calcular_pyg():
@@ -171,6 +177,7 @@ with st.expander("🏢 Detalle de Costes Fijos", expanded=False):
                 value=int(valor),
                 step=1000,
                 format="%d",
-                key=f"slider_{categoria}"
+                key=f"slider_{categoria}",
+                on_change=on_slider_change
             )
             st.session_state.costes_fijos_detalle[categoria] = slider_value
