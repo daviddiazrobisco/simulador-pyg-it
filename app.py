@@ -48,6 +48,16 @@ def get_estado(valor_pct, benchmark):
     else:
         return COLOR_NARANJA, "⚠️"
 
+def comentario_estrategico(kpi, valor_pct, benchmark):
+    """Genera comentario según estado del KPI"""
+    min_bm, max_bm = benchmark
+    if valor_pct < min_bm:
+        return f"🔴 {kpi} bajo: considera subir tarifas o reducir costes directos."
+    elif valor_pct > max_bm:
+        return f"🟠 {kpi} alto: revisa posibles ineficiencias operativas."
+    else:
+        return f"✅ {kpi} en rango óptimo."
+
 # -------------------------------
 # Componente KPI reutilizable
 # -------------------------------
@@ -102,16 +112,16 @@ for linea, valores in param['lineas_negocio'].items():
         tarifa = st.slider(
             f"Tarifa media {linea} (€)",
             min_value=0,
-            max_value=int(valores['tarifa'] * 2),
-            value=int(valores['tarifa']),
+            max_value=int(valores.get('tarifa', 1000) * 2),
+            value=int(valores.get('tarifa', 1000)),
             step=100
         )
 
         unidades = st.slider(
             f"Unidades/Proyectos {linea}",
             min_value=0,
-            max_value=int(valores['unidades'] * 2),
-            value=int(valores['unidades']),
+            max_value=int(valores.get('unidades', 10) * 2),
+            value=int(valores.get('unidades', 10)),
             step=1
         )
 
@@ -126,8 +136,8 @@ for linea, valores in param['lineas_negocio'].items():
         # Cálculos
         facturacion_linea = tarifa * unidades * actividad
 
-        # Costes directos: Si hay personas asignadas se calcula por personas, si no usa %
-        if valores['personas'] > 0:
+        # Costes directos: Si hay personas, calcular; si no, usar %
+        if valores.get('personas', 0) > 0:
             costes_directos_linea = valores['personas'] * valores['coste_medio_persona'] * actividad
         else:
             costes_directos_linea = facturacion_linea * (valores['costes_directos_%'] / 100)
@@ -143,13 +153,19 @@ for linea, valores in param['lineas_negocio'].items():
             kpi_card("Facturación", facturacion_linea, facturacion_linea / facturacion_total if facturacion_total else 0,
                      tooltip="Ingresos generados por esta línea")
         with linea_cols[1]:
-            kpi_card("Costes Directos", costes_directos_linea, costes_directos_linea / facturacion_linea if facturacion_linea else 0,
-                     benchmark=BENCHMARKS["Costes Directos"],
-                     tooltip="Costes de esta línea")
-        with linea_cols[2]:
-            kpi_card("Margen Bruto", margen_bruto_linea, margen_bruto_linea / facturacion_linea if facturacion_linea else 0,
+            mb_pct = margen_bruto_linea / facturacion_linea if facturacion_linea else 0
+            kpi_card("Margen Bruto", margen_bruto_linea, mb_pct,
                      benchmark=BENCHMARKS["Margen Bruto"],
                      tooltip="Ingresos menos costes directos")
+        with linea_cols[2]:
+            cd_pct = costes_directos_linea / facturacion_linea if facturacion_linea else 0
+            kpi_card("Costes Directos", costes_directos_linea, cd_pct,
+                     benchmark=BENCHMARKS["Costes Directos"],
+                     tooltip="Costes de esta línea")
+
+        # Comentario estratégico
+        comentario = comentario_estrategico("Margen Bruto", mb_pct, BENCHMARKS["Margen Bruto"])
+        st.markdown(f"💬 **{comentario}**")
 
 # -------------------------------
 # BLOQUE COSTES FIJOS
@@ -181,6 +197,7 @@ with st.expander("🏢 Costes Fijos", expanded=False):
 # -------------------------------
 margen_bruto_total = facturacion_total - costes_directos_total
 ebitda_total = margen_bruto_total - costes_fijos
+ebitda_pct = ebitda_total / facturacion_total if facturacion_total else 0
 
 st.header("📊 Resumen Total Empresa")
 total_cols = st.columns(5)
@@ -196,8 +213,12 @@ with total_cols[3]:
     kpi_card("Costes Fijos", costes_fijos, costes_fijos / facturacion_total if facturacion_total else 0,
              benchmark=BENCHMARKS["Costes Fijos"])
 with total_cols[4]:
-    kpi_card("EBITDA", ebitda_total, ebitda_total / facturacion_total if facturacion_total else 0,
+    kpi_card("EBITDA", ebitda_total, ebitda_pct,
              benchmark=BENCHMARKS["EBITDA"])
+
+# Comentario estratégico global
+comentario_total = comentario_estrategico("EBITDA", ebitda_pct, BENCHMARKS["EBITDA"])
+st.markdown(f"💬 **{comentario_total}**")
 
 # -------------------------------
 # GRÁFICO CASCADA
