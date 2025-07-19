@@ -96,7 +96,7 @@ st.title("💻 Simulador PyG Financiero para Empresa IT")
 st.markdown("Ajusta las variables clave de cada línea de negocio y analiza el impacto.")
 
 for linea, valores in param['lineas_negocio'].items():
-    with st.expander(f"📦 {linea.capitalize()}", expanded=False):
+    with st.expander(f"📦 {linea}", expanded=False):
         st.markdown(f"**Configura los parámetros de {linea}**")
 
         tarifa = st.slider(
@@ -107,19 +107,11 @@ for linea, valores in param['lineas_negocio'].items():
             step=100
         )
 
-        proyectos = st.slider(
-            f"Nº Proyectos {linea}",
+        unidades = st.slider(
+            f"Unidades/Proyectos {linea}",
             min_value=0,
-            max_value=int(valores['proyectos'] * 2),
-            value=int(valores['proyectos']),
-            step=1
-        )
-
-        personas = st.slider(
-            f"Nº Personas {linea}",
-            min_value=0,
-            max_value=int(valores['personas'] * 2),
-            value=int(valores['personas']),
+            max_value=int(valores['unidades'] * 2),
+            value=int(valores['unidades']),
             step=1
         )
 
@@ -127,13 +119,19 @@ for linea, valores in param['lineas_negocio'].items():
             f"Nivel de actividad {linea} (%)",
             min_value=0,
             max_value=150,
-            value=int(valores['actividad'] * 100),
+            value=100,
             step=1
         ) / 100  # convertir a ratio
 
         # Cálculos
-        facturacion_linea = tarifa * proyectos * actividad
-        costes_directos_linea = personas * valores['coste_persona'] * actividad
+        facturacion_linea = tarifa * unidades * actividad
+
+        # Costes directos: Si hay personas asignadas se calcula por personas, si no usa %
+        if valores['personas'] > 0:
+            costes_directos_linea = valores['personas'] * valores['coste_medio_persona'] * actividad
+        else:
+            costes_directos_linea = facturacion_linea * (valores['costes_directos_%'] / 100)
+
         margen_bruto_linea = facturacion_linea - costes_directos_linea
 
         facturacion_total += facturacion_linea
@@ -142,14 +140,14 @@ for linea, valores in param['lineas_negocio'].items():
         # KPIs línea
         linea_cols = st.columns(3)
         with linea_cols[0]:
-            kpi_card("Facturación", facturacion_linea, facturacion_linea / facturacion_total,
+            kpi_card("Facturación", facturacion_linea, facturacion_linea / facturacion_total if facturacion_total else 0,
                      tooltip="Ingresos generados por esta línea")
         with linea_cols[1]:
-            kpi_card("Costes Directos", costes_directos_linea, costes_directos_linea / facturacion_linea,
+            kpi_card("Costes Directos", costes_directos_linea, costes_directos_linea / facturacion_linea if facturacion_linea else 0,
                      benchmark=BENCHMARKS["Costes Directos"],
-                     tooltip="Costes de personal directamente asignados")
+                     tooltip="Costes de esta línea")
         with linea_cols[2]:
-            kpi_card("Margen Bruto", margen_bruto_linea, margen_bruto_linea / facturacion_linea,
+            kpi_card("Margen Bruto", margen_bruto_linea, margen_bruto_linea / facturacion_linea if facturacion_linea else 0,
                      benchmark=BENCHMARKS["Margen Bruto"],
                      tooltip="Ingresos menos costes directos")
 
@@ -189,16 +187,16 @@ total_cols = st.columns(5)
 with total_cols[0]:
     kpi_card("Facturación Total", facturacion_total, 1.0, tooltip="Suma de todas las líneas")
 with total_cols[1]:
-    kpi_card("Costes Directos", costes_directos_total, costes_directos_total / facturacion_total,
+    kpi_card("Costes Directos", costes_directos_total, costes_directos_total / facturacion_total if facturacion_total else 0,
              benchmark=BENCHMARKS["Costes Directos"])
 with total_cols[2]:
-    kpi_card("Margen Bruto", margen_bruto_total, margen_bruto_total / facturacion_total,
+    kpi_card("Margen Bruto", margen_bruto_total, margen_bruto_total / facturacion_total if facturacion_total else 0,
              benchmark=BENCHMARKS["Margen Bruto"])
 with total_cols[3]:
-    kpi_card("Costes Fijos", costes_fijos, costes_fijos / facturacion_total,
+    kpi_card("Costes Fijos", costes_fijos, costes_fijos / facturacion_total if facturacion_total else 0,
              benchmark=BENCHMARKS["Costes Fijos"])
 with total_cols[4]:
-    kpi_card("EBITDA", ebitda_total, ebitda_total / facturacion_total,
+    kpi_card("EBITDA", ebitda_total, ebitda_total / facturacion_total if facturacion_total else 0,
              benchmark=BENCHMARKS["EBITDA"])
 
 # -------------------------------
