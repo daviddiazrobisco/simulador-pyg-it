@@ -37,7 +37,7 @@ def kpi_card(title, value, porcentaje, benchmark, estado):
         color_valor = rojo
         icono = "❌"
 
-    # HTML tarjeta
+    # HTML tarjeta mejorado con número y € juntos
     st.markdown(f"""
         <div style="
             background-color:{gris_claro};
@@ -45,13 +45,19 @@ def kpi_card(title, value, porcentaje, benchmark, estado):
             border-radius:10px;
             text-align:center;
             min-height:150px;
+            display:flex;
+            flex-direction:column;
+            justify-content:center;
         ">
-            <h4 style="color:{gris_oscuro}; margin-bottom:5px;">{title}</h4>
-            <p style="font-size:28px; color:{color_valor}; margin:0;"><b>{format_euro(value)}</b></p>
-            <p style="font-size:16px; color:{gris_oscuro}; margin:0;">📊 {porcentaje:.1f}% sobre ventas</p>
-            <p style="font-size:14px; color:#666666; margin:0;">📈 Benchmark: {benchmark} {icono}</p>
+            <h4 style="color:{gris_oscuro}; margin-bottom:8px;">{title}</h4>
+            <p style="font-size:clamp(20px, 3vw, 32px); color:{color_valor}; margin:0; font-weight:bold;">
+                {format_euro(value)}
+            </p>
+            <p style="font-size:14px; color:{gris_oscuro}; margin:3px 0 0 0;">📊 {porcentaje:.1f}% sobre ventas</p>
+            <p style="font-size:13px; color:#666666; margin:0;">📈 Benchmark: {benchmark} {icono}</p>
         </div>
     """, unsafe_allow_html=True)
+
 
 # Sidebar ajustes
 st.sidebar.header("🔧 Ajustes Simulación")
