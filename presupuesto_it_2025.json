@@ -1,0 +1,59 @@
+{
+  "empresa": "Empresa IT",
+  "anio": 2025,
+  "parametros": {
+    "facturacion_objetivo": 5000000,
+    "subactividad_permitida_%": 15,
+    "lineas_negocio": {
+      "Implantación": {
+        "tarifa": 800,
+        "ticket_medio": 350000,
+        "unidades": 11,
+        "personas": 40,
+        "jornadas_por_persona": 214,
+        "coste_medio_persona": 60000,
+        "costes_directos_%": 60.0
+      },
+      "Licencias": {
+        "tarifa": 35000,
+        "ticket_medio": 35000,
+        "unidades": 21,
+        "personas": 0,
+        "jornadas_por_persona": 0,
+        "coste_medio_persona": 0,
+        "costes_directos_%": 35
+      },
+      "Hot line": {
+        "tarifa": 500,
+        "ticket_medio": 6000,
+        "unidades": 42,
+        "personas": 3,
+        "jornadas_por_persona": 0,
+        "coste_medio_persona": 45000,
+        "costes_directos_%": 54.0
+      }
+    },
+    "costes_fijos": {
+      "estructura": 437500.0,
+      "alquiler": 131250.0,
+      "marketing": 87500.0,
+      "suministros": 87500.0,
+      "software_interno": 87500.0,
+      "otros": 43750.0
+    }
+  },
+  "resultados": {
+    "facturacion_total": 5000000,
+    "costes_directos": 2797500,
+    "margen_bruto": 2202500,
+    "costes_fijos": 875000.0,
+    "ebitda": 1327500.0,
+    "ebitda_%": 26.6,
+    "subactividad": {
+      "jornadas_ociosas": 2272,
+      "coste_ocioso": 637312,
+      "utilizacion_real_%": 58.4,
+      "benchmark_utilizacion_%": "70–75%"
+    }
+  }
+}
