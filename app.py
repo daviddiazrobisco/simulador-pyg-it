@@ -46,16 +46,30 @@ def get_estado(valor_pct, benchmark):
         return COLOR_NARANJA, "⚠️"
 
 # -------------------------------
-# Componente KPI con slider integrado
+# Componente KPI con slider integrado (solo para detalle)
 # -------------------------------
 def kpi_card_slider(nombre, valor, facturacion, benchmark=None, tooltip=None, max_valor=None):
     porcentaje = valor / facturacion
     color, icono = get_estado(porcentaje, benchmark) if benchmark else (COLOR_VERDE, "✅")
     comparativa = f"<br><small>Benchmark: {int(benchmark[0]*100)}–{int(benchmark[1]*100)}%</small>" if benchmark else ""
 
-    # Slider integrado visualmente
+    # Tarjeta KPI con slider integrado arriba
+    html = f"""
+    <div style="background-color:{COLOR_GRIS}; border-left:5px solid {color};
+                padding:10px; border-radius:8px; transition: transform 0.2s; 
+                display:flex; flex-direction:column; align-items:center;
+                justify-content:space-between; min-height:240px;"
+         onmouseover="this.style.transform='scale(1.02)'"
+         onmouseout="this.style.transform='scale(1)'"
+         title="{tooltip or nombre}">
+        <div style="width:100%; margin-bottom:10px;">
+            <small style="color:{COLOR_TEXTO}; font-size:12px;">Ajustar {nombre} (€)</small>
+        </div>
+    """
+    st.markdown(html, unsafe_allow_html=True)
+
     nuevo_valor = st.slider(
-        f"Ajustar {nombre} (€)", 
+        "",  # Sin etiqueta porque ya la pusimos arriba
         min_value=0,
         max_value=int(max_valor or valor*2),
         value=int(valor),
@@ -64,20 +78,13 @@ def kpi_card_slider(nombre, valor, facturacion, benchmark=None, tooltip=None, ma
         key=f"slider_{nombre}"
     )
 
-    html = f"""
-    <div style="background-color:{COLOR_GRIS}; border-left:5px solid {color};
-                padding:10px; border-radius:8px; transition: transform 0.2s; 
-                display:flex; flex-direction:column; align-items:center;
-                justify-content:space-between; min-height:220px;"
-         onmouseover="this.style.transform='scale(1.02)'"
-         onmouseout="this.style.transform='scale(1)'"
-         title="{tooltip or nombre}">
-        <div style="font-size:18px; color:{COLOR_TEXTO}; margin-bottom:5px;">{nombre} {icono}</div>
-        <div style="font-size:26px; font-weight:bold; color:{color}; margin-bottom:5px;">{format_euro(nuevo_valor)}</div>
-        <div style="font-size:14px; color:{COLOR_TEXTO}; margin-bottom:10px;">{round(porcentaje*100,1)}% sobre ventas{comparativa}</div>
+    html_bottom = f"""
+        <div style="font-size:18px; color:{COLOR_TEXTO}; margin-top:5px;">{nombre} {icono}</div>
+        <div style="font-size:26px; font-weight:bold; color:{color}; margin-top:5px;">{format_euro(nuevo_valor)}</div>
+        <div style="font-size:14px; color:{COLOR_TEXTO}; margin-top:5px;">{round(porcentaje*100,1)}% sobre ventas{comparativa}</div>
     </div>
     """
-    st.markdown(html, unsafe_allow_html=True)
+    st.markdown(html_bottom, unsafe_allow_html=True)
     return nuevo_valor
 
 # -------------------------------
@@ -123,19 +130,19 @@ def calcular_pyg():
 pyg = calcular_pyg()
 
 st.title("💻 Simulador PyG Financiero para Empresa IT")
-st.markdown("Ajusta las variables clave y observa el impacto en tiempo real.")
+st.markdown("Ajusta los costes fijos y observa el impacto en tiempo real.")
 
 col1, col2, col3, col4, col5 = st.columns(5)
 with col1:
-    kpi_card_slider("Facturación Total", facturacion_default, facturacion_default, tooltip="Ingresos totales estimados")
+    st.metric("Facturación Total", format_euro(facturacion_default))
 with col2:
-    kpi_card_slider("Costes Directos", pyg['costes_directos'], facturacion_default, BENCHMARKS["Costes Directos"])
+    st.metric("Costes Directos", format_euro(pyg['costes_directos']))
 with col3:
-    kpi_card_slider("Margen Bruto", pyg['margen_bruto'], facturacion_default, BENCHMARKS["Margen Bruto"])
+    st.metric("Margen Bruto", format_euro(pyg['margen_bruto']))
 with col4:
-    kpi_card_slider("Costes Fijos", pyg['costes_fijos'], facturacion_default, BENCHMARKS["Costes Fijos"])
+    st.metric("Costes Fijos", format_euro(pyg['costes_fijos']))
 with col5:
-    kpi_card_slider("EBITDA", pyg['ebitda'], facturacion_default, BENCHMARKS["EBITDA"])
+    st.metric("EBITDA", format_euro(pyg['ebitda']))
 
 # -------------------------------
 # Gráfico cascada
@@ -161,7 +168,7 @@ fig.update_layout(
 st.plotly_chart(fig, use_container_width=True)
 
 # -------------------------------
-# Bloque Costes Fijos (tarjetas en línea)
+# Bloque Costes Fijos (tarjetas en línea con sliders integrados)
 # -------------------------------
 st.markdown("### 🏢 Detalle de Costes Fijos")
 detalle_cols = st.columns(len(costes_fijos_default))
