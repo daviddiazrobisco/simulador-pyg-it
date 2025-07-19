@@ -37,11 +37,11 @@ def kpi_card(title, value, porcentaje, benchmark, estado):
         color_valor = rojo
         icono = "❌"
 
-    # HTML tarjeta responsive
+    # HTML tarjeta con animación hover
     st.markdown(f"""
         <div class="kpi-card">
             <h4 style="color:{gris_oscuro}; margin-bottom:8px;">{title}</h4>
-            <p style="font-size:clamp(20px, 3vw, 32px); color:{color_valor}; margin:0; font-weight:bold;">
+            <p style="font-size:2rem; color:{color_valor}; margin:0; font-weight:bold;">
                 {format_euro(value)}
             </p>
             <p style="font-size:14px; color:{gris_oscuro}; margin:3px 0 0 0;">📊 {porcentaje:.1f}% sobre ventas</p>
@@ -49,24 +49,33 @@ def kpi_card(title, value, porcentaje, benchmark, estado):
         </div>
     """, unsafe_allow_html=True)
 
-# Estilos CSS para layout responsive
+# Estilos CSS: fila única + animación hover
 st.markdown(f"""
     <style>
-        .kpi-grid {{
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        .kpi-row {{
+            display: flex;
+            flex-wrap: nowrap;
+            overflow-x: auto;
             gap: 16px;
-            margin-top: 20px;
+            padding-bottom: 10px;
         }}
         .kpi-card {{
             background-color:{gris_claro};
             padding:15px;
             border-radius:10px;
             text-align:center;
-            min-height:150px;
-            display:flex;
-            flex-direction:column;
-            justify-content:center;
+            min-width:220px;
+            flex: 1;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }}
+        .kpi-card:hover {{
+            transform: scale(1.03);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }}
+        @media (max-width: 768px) {{
+            .kpi-card {{
+                min-width: 250px;
+            }}
         }}
     </style>
 """, unsafe_allow_html=True)
@@ -130,8 +139,8 @@ estado_ebitda = get_estado(pct_ebitda, benchmarks["EBITDA"])
 st.title("💻 Simulador PyG Financiero para Empresa IT")
 st.markdown("Ajusta las variables clave y observa el impacto en tiempo real.")
 
-# Mostrar tarjetas KPI en grid responsive
-st.markdown('<div class="kpi-grid">', unsafe_allow_html=True)
+# Mostrar tarjetas KPI en fila única con scroll en móvil
+st.markdown('<div class="kpi-row">', unsafe_allow_html=True)
 kpi_card("Facturación Total", facturacion, 100, "-", "ok")
 kpi_card("Costes Directos", costes_directos, pct_costes_directos, "50–55%", estado_costes_directos)
 kpi_card("Margen Bruto", margen_bruto, pct_margen_bruto, "45–50%", estado_margen_bruto)
