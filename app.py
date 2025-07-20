@@ -93,6 +93,7 @@ with open('data/benchmarks_it.json') as f:
 param = data['parametros']
 facturacion_total = data['resultados']['facturacion_total']
 subactividad_permitida = param.get("subactividad_permitida_%", 15) / 100
+nivel_subactividad_benchmark = benchmarks['global']['nivel_subactividad']
 
 # Mapeo líneas de negocio → benchmarks
 mapa_lineas_benchmark = {
@@ -203,6 +204,44 @@ for linea_nombre, linea in param['lineas_negocio'].items():
                      benchmark=(benchmark_linea['margen_bruto'][0], benchmark_linea['margen_bruto'][2]) if benchmark_linea else None,
                      tipo="margen", tooltip="Margen sobre facturación línea")
 
+        # Velocímetro y tabla jornadas (si aplica)
+        if linea['personas'] > 0 and linea['jornadas_por_persona'] > 0:
+            jornadas_disponibles = nuevo_personas * linea['jornadas_por_persona']
+            jornadas_utilizadas = (ticket_medio / nueva_tarifa) * nuevo_unidades
+            utilizacion_real_pct = jornadas_utilizadas / jornadas_disponibles if jornadas_disponibles else 1
+            exceso_subactividad = max(0, jornadas_disponibles * (1 - subactividad_permitida) - jornadas_utilizadas)
+            coste_ocioso = exceso_subactividad * (nuevo_coste_medio / linea['jornadas_por_persona'])
+
+            # Velocímetro con benchmark global
+            bm_util_min = 1 - nivel_subactividad_benchmark[2]
+            bm_util_max = 1 - nivel_subactividad_benchmark[1]
+            fig_gauge = go.Figure(go.Indicator(
+                mode="gauge+number+delta",
+                value=utilizacion_real_pct * 100,
+                title={'text': "Nivel de Actividad (%)"},
+                gauge={
+                    'axis': {'range': [0, 100]},
+                    'bar': {'color': COLOR_NARANJA},
+                    'steps': [
+                        {'range': [0, bm_util_min*100], 'color': COLOR_ROJO},
+                        {'range': [bm_util_min*100, bm_util_max*100], 'color': COLOR_VERDE},
+                        {'range': [bm_util_max*100, 100], 'color': COLOR_NARANJA}
+                    ],
+                    'threshold': {'line': {'color': COLOR_ESTRELLA, 'width': 4}, 'thickness': 0.75, 'value': 100}
+                }
+            ))
+            st.plotly_chart(fig_gauge, use_container_width=True)
+
+            # Tabla jornadas
+            st.markdown(f"""
+            - 📅 **Jornadas disponibles**: {int(jornadas_disponibles)}
+            - ⏳ **Jornadas utilizadas**: {int(jornadas_utilizadas)}
+            - 📊 **% Utilización real**: {round(utilizacion_real_pct*100,1)}%
+            - 🔄 **Subactividad asumible ({int(subactividad_permitida*100)}%)**: {int(jornadas_disponibles*subactividad_permitida)} jornadas
+            - 🚨 **Exceso Subactividad**: {int(exceso_subactividad)} jornadas
+            - 💸 **Coste asociado**: {format_euro(coste_ocioso)}
+            """, unsafe_allow_html=True)
+
         # Gráfico cascada
         fig = go.Figure(go.Waterfall(
             name="Resultados",
@@ -222,41 +261,6 @@ for linea_nombre, linea in param['lineas_negocio'].items():
             margin=dict(l=10, r=10, t=40, b=10)
         )
         st.plotly_chart(fig, use_container_width=True)
-
-        # Velocímetro y tabla jornadas (si aplica)
-        if linea['personas'] > 0 and linea['jornadas_por_persona'] > 0:
-            jornadas_disponibles = nuevo_personas * linea['jornadas_por_persona']
-            jornadas_utilizadas = (ticket_medio / nueva_tarifa) * nuevo_unidades
-            utilizacion_real_pct = jornadas_utilizadas / jornadas_disponibles if jornadas_disponibles else 1
-            exceso_subactividad = max(0, jornadas_disponibles * (1 - subactividad_permitida) - jornadas_utilizadas)
-            coste_ocioso = exceso_subactividad * (nuevo_coste_medio / linea['jornadas_por_persona'])
-
-            # Velocímetro
-            fig_gauge = go.Figure(go.Indicator(
-                mode="gauge+number+delta",
-                value=utilizacion_real_pct * 100,
-                title={'text': "Nivel de Actividad (%)"},
-                gauge={
-                    'axis': {'range': [0, 100]},
-                    'bar': {'color': COLOR_NARANJA},
-                    'steps': [
-                        {'range': [0, subactividad_permitida * 100], 'color': COLOR_ROJO},
-                        {'range': [subactividad_permitida * 100, 100], 'color': COLOR_VERDE}
-                    ],
-                    'threshold': {'line': {'color': COLOR_ESTRELLA, 'width': 4}, 'thickness': 0.75, 'value': 100}
-                }
-            ))
-            st.plotly_chart(fig_gauge, use_container_width=True)
-
-            # Tabla jornadas
-            st.markdown(f"""
-            - 📅 **Jornadas disponibles**: {int(jornadas_disponibles)}
-            - ⏳ **Jornadas utilizadas**: {int(jornadas_utilizadas)}
-            - 📊 **% Utilización real**: {round(utilizacion_real_pct*100,1)}%
-            - 🔄 **Subactividad asumible ({int(subactividad_permitida*100)}%)**: {int(jornadas_disponibles*subactividad_permitida)} jornadas
-            - 🚨 **Exceso Subactividad**: {int(exceso_subactividad)} jornadas
-            - 💸 **Coste asociado**: {format_euro(coste_ocioso)}
-            """, unsafe_allow_html=True)
 
 # -------------------------------
 # Resumen total
