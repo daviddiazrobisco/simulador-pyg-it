@@ -27,31 +27,38 @@ def format_euro(valor):
 # -------------------------------
 # Función estado de alerta
 # -------------------------------
-def get_estado(valor_pct, benchmark, tipo="coste"):
+def get_estado(valor_pct, benchmark, tipo="coste", valor_abs=None):
     if benchmark:
         min_bm, max_bm = benchmark
-        if tipo == "coste":
-            if valor_pct < min_bm:
-                return COLOR_ESTRELLA, "⭐"
-            elif min_bm <= valor_pct <= max_bm:
+        if tipo == "tarifa" and valor_abs is not None:
+            if valor_abs < min_bm:
+                return COLOR_NARANJA, "⚠️"
+            elif min_bm <= valor_abs <= max_bm:
                 return COLOR_VERDE, "✅"
             else:
-                return COLOR_NARANJA, "⚠️"
-        else:  # márgenes y EBITDA
-            if valor_pct > max_bm:
                 return COLOR_ESTRELLA, "⭐"
-            elif min_bm <= valor_pct <= max_bm:
-                return COLOR_VERDE, "✅"
-            else:
-                return COLOR_NARANJA, "⚠️"
-    else:
-        return COLOR_TEXTO, ""
+        elif valor_pct is not None:
+            if tipo == "coste":
+                if valor_pct < min_bm:
+                    return COLOR_ESTRELLA, "⭐"
+                elif min_bm <= valor_pct <= max_bm:
+                    return COLOR_VERDE, "✅"
+                else:
+                    return COLOR_NARANJA, "⚠️"
+            else:  # márgenes y EBITDA
+                if valor_pct > max_bm:
+                    return COLOR_ESTRELLA, "⭐"
+                elif min_bm <= valor_pct <= max_bm:
+                    return COLOR_VERDE, "✅"
+                else:
+                    return COLOR_NARANJA, "⚠️"
+    return COLOR_TEXTO, ""
 
 # -------------------------------
 # Componente KPI reutilizable
 # -------------------------------
 def kpi_card(nombre, valor_abs, valor_pct, benchmark=None, tipo="coste", tooltip=None, show_euro=True):
-    color, icono = get_estado(valor_pct, benchmark, tipo)
+    color, icono = get_estado(valor_pct, benchmark, tipo, valor_abs=valor_abs if tipo == "tarifa" else None)
     if benchmark:
         comparativa = f"<br><small>Benchmark: {int(benchmark[0]*100)}–{int(benchmark[1]*100)}%</small>" if tipo != "tarifa" else f"<br><small>Benchmark: {int(benchmark[0])}–{int(benchmark[1])} €</small>"
     else:
@@ -151,7 +158,7 @@ for linea_nombre, linea in param['lineas_negocio'].items():
                                        min_value=0, max_value=int(linea['unidades']*2),
                                        value=int(linea['unidades']), step=1)
             kpi_card("Número de Unidades", nuevo_unidades, None,
-                     tooltip="Proyectos o ventas")
+                     tooltip="Proyectos o ventas", show_euro=False)
 
         # Personas y Coste Medio Persona (si aplica)
         if linea['personas'] > 0:
