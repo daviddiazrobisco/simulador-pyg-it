@@ -78,7 +78,8 @@ costes_fijos = resultados['costes_fijos']
 # Benchmarks (simplificado aquí)
 benchmarks = {
     "Implantación": {
-        "Precio Medio Proyecto": {"min": 700, "max": 900},
+        "Importe Medio Proyecto": {"min": 180000, "max": 220000},
+        "Tarifa Media Jornada": {"min": 700, "max": 900},
         "Coste Medio Persona": {"min": 45000, "max": 55000},
         "Nivel Actividad": {"min": 70, "max": 100},
         "Margen Bruto (%)": {"min": 25, "max": 30}
@@ -98,9 +99,13 @@ with col_izq:
         st.markdown("Ajusta las variables de la línea Implantación:")
 
         # Sliders
-        tarifa = st.slider("💵 Tarifa Media Proyecto (€)", 500, 1200, int(linea['tarifa']), step=50, format="%d")
-        kpi_card("Tarifa Media Proyecto", tarifa, tarifa / facturacion_total,
-                 benchmark=benchmarks["Implantación"]["Precio Medio Proyecto"])
+        importe_proyecto = st.slider("💶 Importe Medio Proyecto (€)", 100000, 300000, 200000, step=5000, format="%d")
+        kpi_card("Importe Medio Proyecto", importe_proyecto, importe_proyecto / facturacion_total,
+                 benchmark=benchmarks["Implantación"]["Importe Medio Proyecto"])
+
+        tarifa_jornada = st.slider("💵 Tarifa Media Jornada (€)", 500, 1200, int(linea['tarifa']), step=50, format="%d")
+        kpi_card("Tarifa Media Jornada", tarifa_jornada, tarifa_jornada / facturacion_total,
+                 benchmark=benchmarks["Implantación"]["Tarifa Media Jornada"])
 
         num_proyectos = st.slider("📦 Nº Proyectos", 5, 30, int(linea['unidades']), step=1)
         kpi_card("Nº Proyectos", num_proyectos, num_proyectos / 100)
@@ -113,7 +118,10 @@ with col_izq:
                  benchmark=benchmarks["Implantación"]["Coste Medio Persona"])
 
         # Cálculos
-        facturacion_implantacion = tarifa * num_proyectos
+        jornadas_proyecto = importe_proyecto / tarifa_jornada
+        jornadas_facturadas = num_proyectos * jornadas_proyecto
+        facturacion_implantacion = jornadas_facturadas * tarifa_jornada
+
         coste_personal = num_personas * coste_medio_persona
         otros_costes = facturacion_implantacion * linea['costes_directos_%']
         costes_directos_implantacion = coste_personal + otros_costes
@@ -121,7 +129,6 @@ with col_izq:
         margen_pct = (margen_implantacion / facturacion_implantacion) * 100 if facturacion_implantacion else 0
 
         # Nivel de Actividad
-        jornadas_facturadas = num_proyectos * 10  # 10 jornadas por proyecto
         jornadas_disponibles = num_personas * 220
         nivel_actividad = (jornadas_facturadas / jornadas_disponibles) * 100 if jornadas_disponibles else 0
 
@@ -135,23 +142,28 @@ with col_izq:
             estado_actividad = "✅ Óptimo"
             color_act = COLOR_VERDE
 
-        # Gráfico nivel actividad
-        fig_termometro = go.Figure(go.Indicator(
-            mode="gauge+number+delta",
-            value=nivel_actividad,
-            delta={'reference': 85, 'increasing': {'color': COLOR_NARANJA}},
-            gauge={
-                'axis': {'range': [0, 120]},
-                'bar': {'color': color_act},
-                'steps': [
-                    {'range': [0, 70], 'color': COLOR_ROJO},
-                    {'range': [70, 100], 'color': COLOR_VERDE},
-                    {'range': [100, 120], 'color': COLOR_NARANJA}
-                ]
-            },
-            title={'text': f"🔥 Nivel de Actividad {estado_actividad}"}
+        # Gráfico barra horizontal nivel actividad
+        fig_barra = go.Figure(go.Bar(
+            x=[nivel_actividad],
+            y=["Nivel de Actividad"],
+            orientation='h',
+            marker=dict(
+                color=[color_act],
+                line=dict(color=COLOR_TEXTO, width=1)
+            ),
+            text=f"{round(nivel_actividad, 1)}%",
+            textposition="outside"
         ))
-        st.plotly_chart(fig_termometro, use_container_width=True)
+        fig_barra.update_layout(
+            xaxis=dict(range=[0, 120], title="%", showgrid=False),
+            yaxis=dict(showgrid=False),
+            title=f"🔥 Nivel de Actividad {estado_actividad}",
+            plot_bgcolor=COLOR_FONDO,
+            paper_bgcolor=COLOR_FONDO,
+            font=dict(color=COLOR_TEXTO),
+            margin=dict(l=10, r=10, t=40, b=10)
+        )
+        st.plotly_chart(fig_barra, use_container_width=True)
 
         # Subactividad informativa
         subactividad_asumible = jornadas_disponibles * 0.15
