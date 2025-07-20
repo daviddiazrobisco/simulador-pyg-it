@@ -8,11 +8,12 @@ import plotly.graph_objects as go
 with open('data/benchmarks_it.json') as f:
     benchmarks = json.load(f)
 
-with open('presupuesto_it_2025.json') as f:
+with open('data/presupuesto_it_2025.json') as f:
     data = json.load(f)
 
-# Datos iniciales para Consultoría
-consultoria = data['parametros']['lineas_negocio']['consultoria']
+# Datos línea Implantación
+implantacion = data['parametros']['lineas_negocio']['Implantación']
+benchmark_linea = benchmarks['lineas_negocio']['Implantación']
 
 # -------------------------------
 # Funciones auxiliares
@@ -34,7 +35,7 @@ def get_estado(valor, benchmark, tipo='mas_es_mejor'):
         elif valor >= min_val: return "✅", "#144C44"
         else: return "⭐", "#fb9200"
 
-def calcular_consultoria(tarifa, ticket, unidades, personas, coste_persona, costes_directos_pct, jornadas_persona):
+def calcular_implantacion(tarifa, ticket, unidades, personas, coste_persona, costes_directos_pct, jornadas_persona):
     facturacion = ticket * unidades
     costes_personas = personas * coste_persona
     costes_directos = (costes_directos_pct / 100) * facturacion
@@ -46,54 +47,54 @@ def calcular_consultoria(tarifa, ticket, unidades, personas, coste_persona, cost
         jornadas_totales = jornadas_persona * personas
         jornadas_utilizadas = (ticket / tarifa) * unidades
         subactividad_jornadas = jornadas_totales - jornadas_utilizadas
-        if jornadas_totales > 0:
-            nivel_actividad = (jornadas_utilizadas / jornadas_totales) * 100
-        else:
-            nivel_actividad = 100
+        nivel_actividad = (jornadas_utilizadas / jornadas_totales) * 100
     else:
-        nivel_actividad = None  # No aplica
+        jornadas_totales = jornadas_utilizadas = subactividad_jornadas = nivel_actividad = None
 
     return {
         "facturacion": facturacion,
         "costes_directos": total_costes_directos,
         "margen_bruto": margen_bruto,
+        "jornadas_totales": jornadas_totales,
+        "jornadas_utilizadas": jornadas_utilizadas,
+        "subactividad_jornadas": subactividad_jornadas,
         "nivel_actividad": nivel_actividad
     }
 
 # -------------------------------
-# Bloque Consultoría
+# Bloque Implantación
 # -------------------------------
-with st.expander("🔽 Consultoría (Haz clic para ajustar)", expanded=False):
-    st.markdown("Ajusta los parámetros para la línea de negocio **Consultoría** y observa el impacto en tiempo real.")
+with st.expander("🔽 Implantación (Haz clic para ajustar)", expanded=False):
+    st.markdown("Ajusta los parámetros para la línea de negocio **Implantación** y observa el impacto en tiempo real.")
 
-    # Sliders
-    tarifa = st.slider("Tarifa (€)", 30000, 70000, int(consultoria['tarifa']), step=1000)
-    ticket = st.slider("Ticket medio (€)", 30000, 70000, int(consultoria['ticket_medio']), step=1000)
-    unidades = st.slider("Número de proyectos", 1, 50, int(consultoria['unidades']), step=1)
-    personas = st.slider("Número de personas", 0, 20, int(consultoria['personas']), step=1)
-    coste_persona = st.slider("Coste medio persona (€)", 30000, 80000, int(consultoria['coste_medio_persona']), step=1000)
-    costes_pct = st.slider("Costes directos (%)", 10, 70, int(consultoria['costes_directos_%']), step=1)
+    # Sliders + KPIs
+    tarifa = st.slider("Tarifa (€)", 500, 1500, int(implantacion['tarifa']), step=50)
+    ticket = st.slider("Ticket medio (€)", 100000, 600000, int(implantacion['ticket_medio']), step=5000)
+    unidades = st.slider("Número de proyectos", 1, 50, int(implantacion['unidades']), step=1)
+    personas = st.slider("Número de personas", 0, 100, int(implantacion['personas']), step=1)
+    coste_persona = st.slider("Coste medio persona (€)", 30000, 90000, int(implantacion['coste_medio_persona']), step=1000)
+    costes_pct = st.slider("Costes directos (%)", 0, 70, int(implantacion['costes_directos_%']), step=1)
 
     # Cálculos
-    resultados = calcular_consultoria(tarifa, ticket, unidades, personas, coste_persona, costes_pct, consultoria['jornadas_por_persona'])
+    resultados = calcular_implantacion(tarifa, ticket, unidades, personas, coste_persona, costes_pct, implantacion['jornadas_por_persona'])
 
-    # KPIs resumen
-    st.markdown("### 📊 Resultados Línea Consultoría")
+    # KPIs resumen en tarjetas
+    st.markdown("### 📊 Resultados Línea Implantación")
     col1, col2, col3 = st.columns(3)
     with col1:
-        simbolo, color = get_estado(resultados['facturacion'], benchmarks['lineas_negocio']['consultoria']['precio_jornada'], 'mas_es_mejor')
-        st.metric("Facturación", format_euro(resultados['facturacion']), delta=f"{simbolo}")
+        simbolo, color = get_estado(resultados['facturacion'], benchmark_linea['precio_jornada'], 'mas_es_mejor')
+        st.markdown(f"<div style='border-left:5px solid {color}; padding:10px'><b>Facturación</b><br>{format_euro(resultados['facturacion'])} {simbolo}</div>", unsafe_allow_html=True)
     with col2:
-        simbolo, color = get_estado(resultados['costes_directos'], benchmarks['lineas_negocio']['consultoria']['margen_bruto'], 'menos_es_mejor')
-        st.metric("Costes Directos", format_euro(resultados['costes_directos']), delta=f"{simbolo}")
+        simbolo, color = get_estado(resultados['costes_directos'], benchmark_linea['margen_bruto'], 'menos_es_mejor')
+        st.markdown(f"<div style='border-left:5px solid {color}; padding:10px'><b>Costes Directos</b><br>{format_euro(resultados['costes_directos'])} {simbolo}</div>", unsafe_allow_html=True)
     with col3:
-        simbolo, color = get_estado(resultados['margen_bruto'], benchmarks['lineas_negocio']['consultoria']['ebitda'], 'mas_es_mejor')
-        st.metric("Margen Bruto", format_euro(resultados['margen_bruto']), delta=f"{simbolo}")
+        simbolo, color = get_estado(resultados['margen_bruto'], benchmark_linea['ebitda'], 'mas_es_mejor')
+        st.markdown(f"<div style='border-left:5px solid {color}; padding:10px'><b>Margen Bruto</b><br>{format_euro(resultados['margen_bruto'])} {simbolo}</div>", unsafe_allow_html=True)
 
     # Velocímetro Nivel Actividad
     if resultados['nivel_actividad'] is not None:
-        min_sub, media_sub, max_sub = benchmarks['lineas_negocio']['consultoria']['utilizacion']
-        gauge_color = "#144C44" if min_sub <= resultados['nivel_actividad'] <= max_sub else "#D33F49"
+        min_sub, media_sub, max_sub = benchmark_linea['utilizacion']
+        gauge_color = "#144C44" if min_sub * 100 <= resultados['nivel_actividad'] <= max_sub * 100 else "#D33F49"
         fig_gauge = go.Figure(go.Indicator(
             mode="gauge+number",
             value=resultados['nivel_actividad'],
@@ -112,9 +113,22 @@ with st.expander("🔽 Consultoría (Haz clic para ajustar)", expanded=False):
         ))
         st.plotly_chart(fig_gauge, use_container_width=True)
 
+        # Texto debajo del velocímetro
+        st.markdown(f"""
+        📅 **Jornadas disponibles**: {int(resultados['jornadas_totales']) if resultados['jornadas_totales'] else '—'}  
+        ✅ **Jornadas utilizadas**: {int(resultados['jornadas_utilizadas']) if resultados['jornadas_utilizadas'] else '—'}  
+        📊 **% Jornadas utilizadas**: {round(resultados['nivel_actividad'], 1)}%  
+        🔄 **Subactividad asumible ({data['parametros']['subactividad_permitida_%']}%)**: {int(resultados['jornadas_totales'] * data['parametros']['subactividad_permitida_%']/100) if resultados['jornadas_totales'] else '—'} jornadas  
+        🚨 **Exceso Subactividad**: {int(resultados['subactividad_jornadas']) if resultados['subactividad_jornadas'] > 0 else 0} jornadas  
+        💸 **Coste asociado**: {format_euro(resultados['subactividad_jornadas'] * coste_persona / jornadas_persona) if resultados['subactividad_jornadas'] and jornadas_persona > 0 else '—'}
+        """)
+
+    else:
+        st.markdown("ℹ️ **Sin nivel de actividad (100% uso supuesto)**")
+
     # Gráfico cascada
     fig_cascada = go.Figure(go.Waterfall(
-        name="Consultoría",
+        name="Implantación",
         orientation="v",
         measure=["relative", "relative", "total"],
         x=["Facturación", "Costes Directos", "Margen Bruto"],
@@ -126,7 +140,7 @@ with st.expander("🔽 Consultoría (Haz clic para ajustar)", expanded=False):
         connector={"line": {"color": "rgb(63, 63, 63)"}}
     ))
     fig_cascada.update_layout(
-        title="Gráfico Cascada - Consultoría",
+        title="Gráfico Cascada - Implantación",
         plot_bgcolor="#FFFFFF",
         paper_bgcolor="#FFFFFF",
         font=dict(color="#333333")
