@@ -52,7 +52,7 @@ def get_estado(valor_pct, benchmark, tipo="coste"):
 def kpi_card(nombre, valor_abs, valor_pct, benchmark=None, tipo="coste", tooltip=None):
     color, icono = get_estado(valor_pct, benchmark, tipo)
     if benchmark:
-        comparativa = f"<br><small>Benchmark: {int(benchmark[0]*100)}–{int(benchmark[1]*100)}%</small>"
+        comparativa = f"<br><small>Benchmark: {int(benchmark[0]*100)}–{int(benchmark[1]*100)}%</small>" if tipo != "tarifa" else f"<br><small>Benchmark: {int(benchmark[0])}–{int(benchmark[1])} €</small>"
     else:
         comparativa = "<br><small>Sin benchmark definido</small>"
 
@@ -66,7 +66,7 @@ def kpi_card(nombre, valor_abs, valor_pct, benchmark=None, tipo="coste", tooltip
          title="{tooltip or nombre}">
         <div style="font-size:18px; color:{COLOR_TEXTO};">{nombre} {icono}</div>
         <div style="font-size:26px; font-weight:bold; color:{color};">{format_euro(valor_abs)}</div>
-        <div style="font-size:14px; color:{COLOR_TEXTO};">{round(valor_pct*100, 1)}% sobre ventas{comparativa}</div>
+        <div style="font-size:14px; color:{COLOR_TEXTO};">{round(valor_pct*100, 1) if valor_pct is not None else '—'}% sobre ventas{comparativa}</div>
     </div>
     """
     st.markdown(html, unsafe_allow_html=True)
@@ -103,9 +103,10 @@ for linea_nombre, linea in param['lineas_negocio'].items():
 
         # Sliders + KPIs
         cols = st.columns(5)
-        
-        # Tarifa (si aplica nivel de actividad)
+
+        # Tarifa + Jornadas (si hay nivel de actividad) o Ticket Medio
         if linea['personas'] > 0 and linea['jornadas_por_persona'] > 0:
+            # Tarifa
             with cols[0]:
                 nueva_tarifa = st.slider("Tarifa (€)", 
                                          min_value=int(linea['tarifa'] * 0.8),
@@ -116,36 +117,45 @@ for linea_nombre, linea in param['lineas_negocio'].items():
                 bm_tarifa = benchmark_linea['precio_jornada'] if benchmark_linea else None
                 kpi_card("Tarifa", nueva_tarifa, nueva_tarifa / facturacion_total,
                          benchmark=(bm_tarifa[0], bm_tarifa[2]) if bm_tarifa else None,
-                         tipo="margen", tooltip="Precio medio jornada")
+                         tipo="tarifa", tooltip="Precio medio jornada")
+            # Jornadas por proyecto
+            with cols[1]:
+                jornadas_x_proyecto = linea['ticket_medio'] // linea['tarifa']
+                nuevas_jornadas = st.slider("Jornadas por Proyecto", 
+                                            min_value=max(1, int(jornadas_x_proyecto * 0.5)),
+                                            max_value=int(jornadas_x_proyecto * 1.5),
+                                            value=int(jornadas_x_proyecto),
+                                            step=1)
+                ticket_medio = nueva_tarifa * nuevas_jornadas
+                kpi_card("Jornadas/Proyecto", nuevas_jornadas, None,
+                         tooltip="Número medio de jornadas por proyecto")
         else:
-            nueva_tarifa = linea['tarifa']
-
-        # Ticket Medio
-        with cols[1]:
-            nuevo_ticket = st.slider("Ticket Medio (€)", 
-                                     min_value=int(linea['ticket_medio'] * 0.5),
-                                     max_value=int(linea['ticket_medio'] * 1.5),
-                                     value=int(linea['ticket_medio']),
-                                     step=1000,
-                                     format="%d")
-            kpi_card("Ticket Medio", nuevo_ticket, nuevo_ticket / facturacion_total,
-                     tooltip="Valor medio por proyecto")
+            # Ticket Medio
+            with cols[0]:
+                ticket_medio = st.slider("Ticket Medio (€)", 
+                                         min_value=int(linea['ticket_medio'] * 0.5),
+                                         max_value=int(linea['ticket_medio'] * 1.5),
+                                         value=int(linea['ticket_medio']),
+                                         step=1000,
+                                         format="%d")
+                kpi_card("Ticket Medio", ticket_medio, ticket_medio / facturacion_total,
+                         tooltip="Valor medio por proyecto")
 
         # Unidades
         with cols[2]:
             nuevo_unidades = st.slider("Número de Unidades", 
                                        min_value=0, max_value=int(linea['unidades']*2),
                                        value=int(linea['unidades']), step=1)
-            kpi_card("Número de Unidades", nuevo_unidades, nuevo_unidades / facturacion_total,
+            kpi_card("Número de Unidades", nuevo_unidades, None,
                      tooltip="Proyectos o ventas")
 
-        # Personas (si aplica)
+        # Personas y Coste Medio Persona (si aplica)
         if linea['personas'] > 0:
             with cols[3]:
                 nuevo_personas = st.slider("Personas", 
                                            min_value=0, max_value=int(linea['personas']*2),
                                            value=int(linea['personas']), step=1)
-                kpi_card("Personas", nuevo_personas, nuevo_personas / facturacion_total,
+                kpi_card("Personas", nuevo_personas, None,
                          tooltip="Número de personas asignadas")
             with cols[4]:
                 nuevo_coste_medio = st.slider("Coste Medio Persona (€)", 
@@ -154,14 +164,14 @@ for linea_nombre, linea in param['lineas_negocio'].items():
                                               value=int(linea['coste_medio_persona']),
                                               step=1000,
                                               format="%d")
-                kpi_card("Coste Medio Persona", nuevo_coste_medio, (nuevo_coste_medio*nuevo_personas)/facturacion_total,
+                kpi_card("Coste Medio Persona", nuevo_coste_medio, None,
                          tooltip="Coste anual medio por persona")
         else:
             nuevo_personas = 0
             nuevo_coste_medio = 0
 
         # Cálculos
-        facturacion_linea = nuevo_ticket * nuevo_unidades
+        facturacion_linea = ticket_medio * nuevo_unidades
         costes_personal = nuevo_personas * nuevo_coste_medio
         costes_directos_pct = linea['costes_directos_%']
         costes_directos = facturacion_linea * (costes_directos_pct / 100) + costes_personal
@@ -177,23 +187,23 @@ for linea_nombre, linea in param['lineas_negocio'].items():
         st.subheader("📊 KPIs Resultados")
         col1, col2, col3 = st.columns(3)
         with col1:
-            kpi_card("Facturación", facturacion_linea, facturacion_linea/facturacion_total,
+            kpi_card("Facturación", facturacion_linea, None,
                      tooltip="Facturación total línea")
         with col2:
-            kpi_card("Costes Directos", costes_directos, costes_directos/facturacion_total,
+            kpi_card("Costes Directos", costes_directos, (costes_directos / facturacion_linea) if facturacion_linea else None,
                      benchmark=(benchmark_linea['margen_bruto'][0], benchmark_linea['margen_bruto'][2]) if benchmark_linea else None,
-                     tipo="coste", tooltip="Costes directos de la línea")
+                     tipo="coste", tooltip="Costes directos sobre facturación línea")
         with col3:
-            kpi_card("Margen Bruto", margen_bruto, margen_bruto/facturacion_total,
+            kpi_card("Margen Bruto", margen_bruto, (margen_bruto / facturacion_linea) if facturacion_linea else None,
                      benchmark=(benchmark_linea['margen_bruto'][0], benchmark_linea['margen_bruto'][2]) if benchmark_linea else None,
-                     tipo="margen", tooltip="Ingresos menos costes directos")
+                     tipo="margen", tooltip="Margen sobre facturación línea")
 
-        # Nivel de actividad si aplica
+        # Nivel de actividad (si aplica)
         if linea['personas'] > 0 and linea['jornadas_por_persona'] > 0:
             st.subheader("⏱️ Nivel de Actividad")
             jornadas_disponibles = nuevo_personas * linea['jornadas_por_persona']
             jornadas_utilizadas = (facturacion_linea / nueva_tarifa)
-            nivel_utilizacion = jornadas_utilizadas / jornadas_disponibles * 100
+            nivel_utilizacion = (jornadas_utilizadas / jornadas_disponibles * 100) if jornadas_disponibles else 0
             benchmark_util = benchmark_linea['utilizacion'] if benchmark_linea else [0.6, 0.75]
 
             # Velocímetro
@@ -245,14 +255,3 @@ for linea_nombre, linea in param['lineas_negocio'].items():
             margin=dict(l=10, r=10, t=40, b=10)
         )
         st.plotly_chart(fig_cascada, use_container_width=True)
-
-# -------------------------------
-# CONTRIBUCIÓN POR LÍNEA
-# -------------------------------
-st.header("📝 Contribución por Línea de Negocio")
-col1, col2, col3 = st.columns(3)
-for idx, (linea_nombre, resultados) in enumerate(resultados_lineas.items()):
-    with [col1, col2, col3][idx]:
-        kpi_card(f"{linea_nombre.upper()} - Facturación", resultados["facturacion"], resultados["facturacion"]/facturacion_total)
-        kpi_card(f"{linea_nombre.upper()} - Costes Directos", resultados["costes_directos"], resultados["costes_directos"]/facturacion_total, tipo="coste")
-        kpi_card(f"{linea_nombre.upper()} - Margen Bruto", resultados["margen_bruto"], resultados["margen_bruto"]/facturacion_total, tipo="margen")
