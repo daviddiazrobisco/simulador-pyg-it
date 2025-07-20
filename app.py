@@ -94,35 +94,44 @@ with col_izq:
         unidades = datos_implantacion['unidades']
         personas = datos_implantacion['personas']
 
-        # Sliders
+        # Slider: Tarifa Media Proyecto
         tarifa = st.slider(
             "💵 Tarifa Media Proyecto (€)", 
             min_value=500, max_value=1200, value=int(datos_implantacion['tarifa']), step=50,
             format="%d"
         )
+        kpi_card("Tarifa Media Proyecto", tarifa, tarifa / facturacion_total,
+                 benchmark=benchmarks["Servicios"]["Precio Medio Proyecto"])
+
+        # Slider: Coste Medio Persona
         coste_persona = st.slider(
             "👥 Coste Medio Persona (€)", 
             min_value=40000, max_value=80000, value=int(datos_implantacion['coste_medio_persona']), step=1000,
             format="%d"
         )
+        kpi_card("Coste Medio Persona", coste_persona, coste_persona / facturacion_total,
+                 benchmark=benchmarks["Servicios"]["Coste Medio Persona"])
+
+        # Slider: Nivel de Actividad
         nivel_actividad = st.slider(
             "🔥 Nivel de Actividad (%)", 
             min_value=50, max_value=110, value=85, step=5,
             format="%d%%"
         )
+        kpi_card("Nivel Actividad", nivel_actividad, nivel_actividad / 100,
+                 benchmark=benchmarks["Servicios"]["Nivel Actividad"])
 
         # KPIs calculados
-        implantacion_facturacion = tarifa * unidades
+        actividad_real = unidades * (nivel_actividad / 100)
+        implantacion_facturacion = tarifa * actividad_real
         implantacion_costes_directos = coste_persona * personas
         implantacion_margen = implantacion_facturacion - implantacion_costes_directos
         margen_pct = implantacion_margen / implantacion_facturacion if implantacion_facturacion else 0
 
         st.subheader("📊 KPIs Implantación")
         kpi_card("Facturación Implantación", implantacion_facturacion, implantacion_facturacion / facturacion_total)
-        kpi_card("Costes Directos Implantación", implantacion_costes_directos, implantacion_costes_directos / facturacion_total,
-                 benchmark=benchmarks["Servicios"]["Coste Medio Persona"])
-        kpi_card("Margen Implantación", implantacion_margen, margen_pct,
-                 benchmark=benchmarks["Servicios"]["Precio Medio Proyecto"])
+        kpi_card("Costes Directos Implantación", implantacion_costes_directos, implantacion_costes_directos / facturacion_total)
+        kpi_card("Margen Implantación", implantacion_margen, margen_pct)
 
         # Mini gráfico cascada
         fig_implantacion = go.Figure(go.Waterfall(
@@ -146,9 +155,9 @@ with col_izq:
         st.plotly_chart(fig_implantacion, use_container_width=True)
 
 # -------------------------------
-# Recalcular resultados globales
+# Recalcular EBITDA global
 # -------------------------------
-margen_bruto = facturacion_total - resultados['costes_directos']
+margen_bruto = resultados['margen_bruto']  # fijo
 ebitda = margen_bruto - costes_fijos
 
 # -------------------------------
