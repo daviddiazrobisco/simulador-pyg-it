@@ -156,10 +156,7 @@ def bloque_linea(nombre_linea, datos_linea, benchmark_linea):
                 mode="gauge+number",
                 value=resultados['nivel_actividad'],
                 title={'text': "Nivel de Actividad (%)"},
-                gauge={
-                    'axis': {'range': [0, 120]},
-                    'bar': {'color': COLOR_VERDE}
-                }
+                gauge={'axis': {'range': [0, 120]}, 'bar': {'color': COLOR_VERDE}}
             ))
             st.plotly_chart(fig_gauge, use_container_width=True)
 
@@ -174,10 +171,45 @@ def bloque_linea(nombre_linea, datos_linea, benchmark_linea):
         ))
         st.plotly_chart(fig_cascada, use_container_width=True)
 
+    return resultados
+
 # -------------------------------
-# Ejecutar bloques de líneas
+# Ejecutar bloques de líneas y acumular resultados
 # -------------------------------
-st.header("📦 Ajuste de Líneas de Negocio")
+total_facturacion = total_costes_directos = total_margen_bruto = 0
 for linea, datos in lineas_negocio.items():
     benchmark_linea = benchmarks['lineas_negocio'][nombre_benchmark[linea]]
-    bloque_linea(linea, datos, benchmark_linea)
+    resultados_linea = bloque_linea(linea, datos, benchmark_linea)
+    total_facturacion += resultados_linea['facturacion']
+    total_costes_directos += resultados_linea['costes_directos']
+    total_margen_bruto += resultados_linea['margen_bruto']
+
+ebitda_total = total_margen_bruto - total_costes_fijos
+
+# -------------------------------
+# KPIs Totales Empresa
+# -------------------------------
+st.header("🏁 Totales Empresa")
+kpi_card("Facturación Total", total_facturacion, total_facturacion/facturacion_objetivo, benchmark=None)
+kpi_card("Costes Directos Totales", total_costes_directos, total_costes_directos/total_facturacion, benchmark=benchmarks['global']['costes_directos'])
+kpi_card("Margen Bruto Total", total_margen_bruto, total_margen_bruto/total_facturacion, benchmark=benchmarks['global']['margen_bruto'])
+kpi_card("Costes Fijos Totales", total_costes_fijos, total_costes_fijos/total_facturacion, benchmark=benchmarks['global']['costes_fijos'])
+kpi_card("EBITDA Total", ebitda_total, ebitda_total/total_facturacion, benchmark=benchmarks['global']['ebitda'])
+
+fig_totales = go.Figure(go.Waterfall(
+    name="Totales Empresa",
+    orientation="v",
+    measure=["relative", "relative", "relative", "total"],
+    x=["Facturación", "Costes Directos", "Costes Fijos", "EBITDA"],
+    textposition="outside",
+    text=[format_euro(total_facturacion), format_euro(-total_costes_directos), format_euro(-total_costes_fijos), format_euro(ebitda_total)],
+    y=[total_facturacion, -total_costes_directos, -total_costes_fijos, ebitda_total],
+    connector={"line": {"color": "rgb(63, 63, 63)"}}
+))
+fig_totales.update_layout(
+    title="Cuenta de Resultados - Totales Empresa",
+    plot_bgcolor=COLOR_FONDO,
+    paper_bgcolor=COLOR_FONDO,
+    font=dict(color=COLOR_TEXTO)
+)
+st.plotly_chart(fig_totales, use_container_width=True)
