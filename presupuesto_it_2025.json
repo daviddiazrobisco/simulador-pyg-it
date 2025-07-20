@@ -12,7 +12,7 @@
         "personas": 40,
         "jornadas_por_persona": 214,
         "coste_medio_persona": 60000,
-        "costes_directos_%": 60.0
+        "costes_directos_%": 0
       },
       "Licencias": {
         "tarifa": 35000,
@@ -30,7 +30,7 @@
         "personas": 3,
         "jornadas_por_persona": 0,
         "coste_medio_persona": 45000,
-        "costes_directos_%": 54.0
+        "costes_directos_%": 0
       }
     },
     "costes_fijos": {
