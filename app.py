@@ -92,8 +92,6 @@ with open('data/benchmarks_it.json') as f:
 
 param = data['parametros']
 facturacion_total = data['resultados']['facturacion_total']
-subactividad_permitida = param.get("subactividad_permitida_%", 15) / 100
-nivel_subactividad_benchmark = benchmarks['global']['nivel_subactividad']
 
 # Mapeo líneas de negocio → benchmarks
 mapa_lineas_benchmark = {
@@ -118,6 +116,7 @@ for linea_nombre, linea in param['lineas_negocio'].items():
 
         # Tarifa + Jornadas (si hay nivel de actividad) o Ticket Medio
         if linea['personas'] > 0 and linea['jornadas_por_persona'] > 0:
+            # Tarifa
             with cols[0]:
                 nueva_tarifa = st.slider("Tarifa (€)", 
                                          min_value=int(linea['tarifa'] * 0.8),
@@ -129,6 +128,7 @@ for linea_nombre, linea in param['lineas_negocio'].items():
                 kpi_card("Tarifa", nueva_tarifa, None,
                          benchmark=(bm_tarifa[0], bm_tarifa[2]) if bm_tarifa else None,
                          tipo="tarifa", tooltip="Precio medio jornada")
+            # Jornadas por proyecto
             with cols[1]:
                 jornadas_x_proyecto = linea['ticket_medio'] // linea['tarifa']
                 nuevas_jornadas = st.slider("Jornadas por Proyecto", 
@@ -140,6 +140,7 @@ for linea_nombre, linea in param['lineas_negocio'].items():
                 kpi_card("Jornadas/Proyecto", nuevas_jornadas, None,
                          tooltip="Número medio de jornadas por proyecto", show_euro=False)
         else:
+            # Ticket Medio
             with cols[0]:
                 ticket_medio = st.slider("Ticket Medio (€)", 
                                          min_value=int(linea['ticket_medio'] * 0.5),
@@ -150,6 +151,7 @@ for linea_nombre, linea in param['lineas_negocio'].items():
                 kpi_card("Ticket Medio", ticket_medio, None,
                          tooltip="Valor medio por proyecto")
 
+        # Unidades
         with cols[2]:
             nuevo_unidades = st.slider("Número de Unidades", 
                                        min_value=0, max_value=int(linea['unidades']*2),
@@ -157,6 +159,7 @@ for linea_nombre, linea in param['lineas_negocio'].items():
             kpi_card("Número de Unidades", nuevo_unidades, None,
                      tooltip="Proyectos o ventas", show_euro=False)
 
+        # Personas y Coste Medio Persona (si aplica)
         if linea['personas'] > 0:
             with cols[3]:
                 nuevo_personas = st.slider("Personas", 
@@ -190,7 +193,7 @@ for linea_nombre, linea in param['lineas_negocio'].items():
             "margen_bruto": margen_bruto
         }
 
-        # KPIs resultados
+        # 📊 KPIs resultados
         st.subheader("📊 KPIs Resultados")
         col1, col2, col3 = st.columns(3)
         with col1:
@@ -204,47 +207,46 @@ for linea_nombre, linea in param['lineas_negocio'].items():
                      benchmark=(benchmark_linea['margen_bruto'][0], benchmark_linea['margen_bruto'][2]) if benchmark_linea else None,
                      tipo="margen", tooltip="Margen sobre facturación línea")
 
-        # Velocímetro y tabla jornadas (si aplica)
+        # 📈 Velocímetro y tabla jornadas (si aplica)
         if linea['personas'] > 0 and linea['jornadas_por_persona'] > 0:
             jornadas_disponibles = nuevo_personas * linea['jornadas_por_persona']
             jornadas_utilizadas = (ticket_medio / nueva_tarifa) * nuevo_unidades
-            utilizacion_real_pct = jornadas_utilizadas / jornadas_disponibles if jornadas_disponibles else 1
-            exceso_subactividad = max(0, jornadas_disponibles * (1 - subactividad_permitida) - jornadas_utilizadas)
-            coste_ocioso = exceso_subactividad * (nuevo_coste_medio / linea['jornadas_por_persona'])
+            utilizacion_real_pct = jornadas_utilizadas / jornadas_disponibles if jornadas_disponibles else 0
 
-            # Velocímetro con benchmark global
-            bm_util_min = 1 - nivel_subactividad_benchmark[2]
-            bm_util_max = 1 - nivel_subactividad_benchmark[1]
+            bm_util = benchmark_linea['utilizacion'] if benchmark_linea else [0.6, 0.7, 0.75]
             fig_gauge = go.Figure(go.Indicator(
-                mode="gauge+number+delta",
-                value=utilizacion_real_pct * 100,
-                title={'text': "Nivel de Actividad (%)"},
+                mode="gauge+number",
+                value=utilizacion_real_pct*100,
                 gauge={
                     'axis': {'range': [0, 100]},
-                    'bar': {'color': COLOR_NARANJA},
                     'steps': [
-                        {'range': [0, bm_util_min*100], 'color': COLOR_ROJO},
-                        {'range': [bm_util_min*100, bm_util_max*100], 'color': COLOR_VERDE},
-                        {'range': [bm_util_max*100, 100], 'color': COLOR_NARANJA}
+                        {'range': [0, bm_util[0]*100], 'color': COLOR_ROJO},
+                        {'range': [bm_util[0]*100, bm_util[2]*100], 'color': COLOR_VERDE},
+                        {'range': [bm_util[2]*100, 100], 'color': COLOR_NARANJA},
                     ],
-                    'threshold': {'line': {'color': COLOR_ESTRELLA, 'width': 4}, 'thickness': 0.75, 'value': 100}
+                    'threshold': {
+                        'line': {'color': "black", 'width': 4},
+                        'thickness': 0.75,
+                        'value': utilizacion_real_pct*100
+                    }
                 }
             ))
+            fig_gauge.update_layout(height=250, margin=dict(t=0, b=0, l=0, r=0))
             st.plotly_chart(fig_gauge, use_container_width=True)
 
-            # Tabla jornadas
             st.markdown(f"""
-            - 📅 **Jornadas disponibles**: {int(jornadas_disponibles)}
-            - ⏳ **Jornadas utilizadas**: {int(jornadas_utilizadas)}
-            - 📊 **% Utilización real**: {round(utilizacion_real_pct*100,1)}%
-            - 🔄 **Subactividad asumible ({int(subactividad_permitida*100)}%)**: {int(jornadas_disponibles*subactividad_permitida)} jornadas
-            - 🚨 **Exceso Subactividad**: {int(exceso_subactividad)} jornadas
-            - 💸 **Coste asociado**: {format_euro(coste_ocioso)}
-            """, unsafe_allow_html=True)
+            **📋 Resumen Jornadas**
+            - Jornadas disponibles: {int(jornadas_disponibles)}
+            - Jornadas utilizadas: {int(jornadas_utilizadas)}
+            - % Utilización real: {round(utilizacion_real_pct*100,1)}%
+            - 🔄 Subactividad asumible ({int(bm_util[0]*100)}%): {int(jornadas_disponibles*(1-bm_util[0]))} jornadas
+            - 🚨 Exceso Subactividad: {max(0, int(jornadas_disponibles - jornadas_utilizadas - jornadas_disponibles*(1-bm_util[0])))}
+            - 💸 Coste asociado: {format_euro((jornadas_disponibles - jornadas_utilizadas) * (nuevo_coste_medio / linea['jornadas_por_persona']))}
+            """)
 
-        # Gráfico cascada
-        fig = go.Figure(go.Waterfall(
-            name="Resultados",
+        # 📉 Gráfico cascada
+        fig_cascada = go.Figure(go.Waterfall(
+            name=linea_nombre,
             orientation="v",
             measure=["relative", "relative", "total"],
             x=["Facturación", "Costes Directos", "Margen Bruto"],
@@ -253,14 +255,14 @@ for linea_nombre, linea in param['lineas_negocio'].items():
             y=[facturacion_linea, -costes_directos, margen_bruto],
             connector={"line": {"color": "rgb(63, 63, 63)"}}
         ))
-        fig.update_layout(
-            title=f"Gráfico Cascada - {linea_nombre}",
+        fig_cascada.update_layout(
+            title=f"Cuenta de Resultados - {linea_nombre}",
             plot_bgcolor=COLOR_FONDO,
             paper_bgcolor=COLOR_FONDO,
             font=dict(color=COLOR_TEXTO),
             margin=dict(l=10, r=10, t=40, b=10)
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig_cascada, use_container_width=True)
 
 # -------------------------------
 # Resumen total
