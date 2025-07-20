@@ -24,10 +24,12 @@ def normalizar(texto):
     return texto.strip().title()
 
 def format_euro(valor):
+    """Formatea número con puntos miles y símbolo €"""
     formatted = f"{int(valor):,}".replace(",", "X").replace(".", ",").replace("X", ".")
     return f"{formatted} €"
 
 def get_estado(valor, benchmark, tipo='mas_es_mejor'):
+    """Devuelve símbolo y color según comparación con benchmark"""
     min_val, media_val, max_val = benchmark
     if tipo == 'mas_es_mejor':
         if valor < min_val: return "⚠️", COLOR_ROJO
@@ -81,6 +83,7 @@ nombre_benchmark = {
 lineas_negocio = {normalizar(k): v for k, v in data['parametros']['lineas_negocio'].items()}
 costes_fijos_detalle = {normalizar(k): v for k, v in data['parametros']['costes_fijos'].items()}
 subactividad_permitida = data['parametros']['subactividad_permitida_%']
+facturacion_objetivo = data['parametros']['facturacion_objetivo']
 
 # -------------------------------
 # Componente KPI reutilizable
@@ -92,10 +95,8 @@ def kpi_card(nombre, valor_abs, valor_pct, benchmark=None, tooltip=None):
     comparativa = f"<br><small>{round(valor_pct*100,1)}% sobre ventas</small>"
 
     html = f"""
-    <div class="kpi-card" style="background-color:{COLOR_GRIS}; 
-                                  border-left:5px solid {color};
-                                  padding:10px; border-radius:8px;
-                                  transition: transform 0.2s; position:relative;"
+    <div style="background-color:{COLOR_GRIS}; border-left:5px solid {color};
+                padding:10px; border-radius:8px; transition: transform 0.2s; position:relative;"
          onmouseover="this.style.transform='scale(1.02)'"
          onmouseout="this.style.transform='scale(1)'"
          title="{tooltip or nombre}">
@@ -107,96 +108,76 @@ def kpi_card(nombre, valor_abs, valor_pct, benchmark=None, tooltip=None):
     st.markdown(html, unsafe_allow_html=True)
 
 # -------------------------------
+# Bloque Costes Fijos
+# -------------------------------
+st.header("🏢 Ajuste Detallado de Costes Fijos")
+cols = st.columns(len(costes_fijos_detalle))
+for idx, (categoria, valor) in enumerate(costes_fijos_detalle.items()):
+    with cols[idx]:
+        nuevo_valor = st.slider(
+            f"{categoria} (€)", 0, int(valor * 2),
+            int(valor), step=1000,
+            key=f"costes_fijos_{categoria}"
+        )
+        costes_fijos_detalle[categoria] = nuevo_valor
+        porcentaje = nuevo_valor / facturacion_objetivo
+        benchmark_cat = benchmarks['global']['costes_fijos']
+        kpi_card(categoria, nuevo_valor, porcentaje, benchmark=benchmark_cat, tooltip=f"Coste fijo en {categoria}")
+
+total_costes_fijos = sum(costes_fijos_detalle.values())
+
+# -------------------------------
 # Bloque Línea de Negocio
 # -------------------------------
 def bloque_linea(nombre_linea, datos_linea, benchmark_linea):
     with st.expander(f"🔽 {nombre_linea} (Haz clic para ajustar)", expanded=False):
         st.markdown(f"Ajusta los parámetros para la línea de negocio **{nombre_linea}** y observa el impacto en tiempo real.")
 
-        # Sliders + KPIs
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            tarifa = st.slider(
-                f"{nombre_linea} - Tarifa (€)", 500, 2000,
-                int(datos_linea['tarifa']),
-                step=50,
-                key=f"{nombre_linea}_tarifa"
-            )
-            simbolo, color = get_estado(tarifa, benchmark_linea['precio_jornada'], 'mas_es_mejor')
-            st.markdown(f"""
-            <div style='border-left:5px solid {color}; padding:10px; border-radius:8px; background-color:{COLOR_GRIS}'>
-                <b>Tarifa</b><br>{format_euro(tarifa)} {simbolo}
-            </div>
-            """, unsafe_allow_html=True)
-
-        with col2:
-            ticket = st.slider(
-                f"{nombre_linea} - Ticket medio (€)", 10000, 600000,
-                int(datos_linea['ticket_medio']),
-                step=5000,
-                key=f"{nombre_linea}_ticket"
-            )
-            st.markdown(f"""
-            <div style='border-left:5px solid {COLOR_VERDE}; padding:10px; border-radius:8px; background-color:{COLOR_GRIS}'>
-                <b>Ticket Medio</b><br>{format_euro(ticket)}
-            </div>
-            """, unsafe_allow_html=True)
-
-        with col3:
-            unidades = st.slider(
-                f"{nombre_linea} - Número de proyectos", 1, 100,
-                int(datos_linea['unidades']),
-                step=1,
-                key=f"{nombre_linea}_unidades"
-            )
-            st.markdown(f"""
-            <div style='border-left:5px solid {COLOR_VERDE}; padding:10px; border-radius:8px; background-color:{COLOR_GRIS}'>
-                <b>Proyectos</b><br>{unidades}
-            </div>
-            """, unsafe_allow_html=True)
-
-        col4, col5 = st.columns(2)
-        with col4:
-            personas = st.slider(
-                f"{nombre_linea} - Número de personas", 0, 100,
-                int(datos_linea['personas']),
-                step=1,
-                key=f"{nombre_linea}_personas"
-            )
-            st.markdown(f"""
-            <div style='border-left:5px solid {COLOR_VERDE}; padding:10px; border-radius:8px; background-color:{COLOR_GRIS}'>
-                <b>Personas</b><br>{personas}
-            </div>
-            """, unsafe_allow_html=True)
-
-        with col5:
-            coste_persona = st.slider(
-                f"{nombre_linea} - Coste medio persona (€)", 30000, 90000,
-                int(datos_linea['coste_medio_persona']),
-                step=1000,
-                key=f"{nombre_linea}_coste_persona"
-            )
-            st.markdown(f"""
-            <div style='border-left:5px solid {COLOR_VERDE}; padding:10px; border-radius:8px; background-color:{COLOR_GRIS}'>
-                <b>Coste Persona</b><br>{format_euro(coste_persona)}
-            </div>
-            """, unsafe_allow_html=True)
-
-        costes_pct = st.slider(
-            f"{nombre_linea} - Costes directos (%)", 0, 70,
-            int(datos_linea['costes_directos_%']),
-            step=1,
-            key=f"{nombre_linea}_costes_pct"
-        )
-        st.markdown(f"""
-        <div style='border-left:5px solid {COLOR_VERDE}; padding:10px; border-radius:8px; background-color:{COLOR_GRIS}'>
-            <b>Costes Directos (%)</b><br>{costes_pct}%
-        </div>
-        """, unsafe_allow_html=True)
+        # Sliders
+        tarifa = st.slider(f"{nombre_linea} - Tarifa (€)", 500, 2000, int(datos_linea['tarifa']), step=50, key=f"{nombre_linea}_tarifa")
+        ticket = st.slider(f"{nombre_linea} - Ticket medio (€)", 10000, 600000, int(datos_linea['ticket_medio']), step=5000, key=f"{nombre_linea}_ticket")
+        unidades = st.slider(f"{nombre_linea} - Número de proyectos", 1, 100, int(datos_linea['unidades']), step=1, key=f"{nombre_linea}_unidades")
+        personas = st.slider(f"{nombre_linea} - Número de personas", 0, 100, int(datos_linea['personas']), step=1, key=f"{nombre_linea}_personas")
+        coste_persona = st.slider(f"{nombre_linea} - Coste medio persona (€)", 30000, 90000, int(datos_linea['coste_medio_persona']), step=1000, key=f"{nombre_linea}_coste_persona")
+        costes_pct = st.slider(f"{nombre_linea} - Costes directos (%)", 0, 70, int(datos_linea['costes_directos_%']), step=1, key=f"{nombre_linea}_costes_pct")
 
         # Cálculos
-        resultados = calcular_linea(
-            tarifa, ticket, unidades,
-            personas, coste_persona,
-            costes_pct, datos_linea['jornadas_por_persona']
-        )
+        resultados = calcular_linea(tarifa, ticket, unidades, personas, coste_persona, costes_pct, datos_linea['jornadas_por_persona'])
+
+        # KPIs Resumen
+        st.subheader("📊 Resultados")
+        kpi_card("Facturación", resultados['facturacion'], resultados['facturacion']/facturacion_objetivo, benchmark_linea['precio_jornada'])
+        kpi_card("Costes Directos", resultados['costes_directos'], resultados['costes_directos']/facturacion_objetivo, benchmark_linea['margen_bruto'])
+        kpi_card("Margen Bruto", resultados['margen_bruto'], resultados['margen_bruto']/facturacion_objetivo, benchmark_linea['ebitda'])
+
+        # Velocímetro y Cascada
+        if resultados['nivel_actividad'] is not None:
+            fig_gauge = go.Figure(go.Indicator(
+                mode="gauge+number",
+                value=resultados['nivel_actividad'],
+                title={'text': "Nivel de Actividad (%)"},
+                gauge={
+                    'axis': {'range': [0, 120]},
+                    'bar': {'color': COLOR_VERDE}
+                }
+            ))
+            st.plotly_chart(fig_gauge, use_container_width=True)
+
+        fig_cascada = go.Figure(go.Waterfall(
+            name=nombre_linea,
+            orientation="v",
+            measure=["relative", "relative", "total"],
+            x=["Facturación", "Costes Directos", "Margen Bruto"],
+            textposition="outside",
+            text=[format_euro(resultados['facturacion']), format_euro(-resultados['costes_directos']), format_euro(resultados['margen_bruto'])],
+            y=[resultados['facturacion'], -resultados['costes_directos'], resultados['margen_bruto']]
+        ))
+        st.plotly_chart(fig_cascada, use_container_width=True)
+
+# -------------------------------
+# Ejecutar bloques de líneas
+# -------------------------------
+st.header("📦 Ajuste de Líneas de Negocio")
+for linea, datos in lineas_negocio.items():
+    benchmark_linea = benchmarks['lineas_negocio'][nombre_benchmark[linea]]
+    bloque_linea(linea, datos, benchmark_linea)
