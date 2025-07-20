@@ -15,21 +15,6 @@ COLOR_GRIS = "#F2F2F2"
 COLOR_TEXTO = "#333333"
 COLOR_FONDO = "#FFFFFF"
 
-# Benchmarks por KPI global y por costes fijos (ajusta con datos reales)
-BENCHMARKS = {
-    "Costes Directos": (0.50, 0.55),
-    "Margen Bruto": (0.45, 0.50),
-    "Costes Fijos": (0.15, 0.20),
-    "EBITDA": (0.25, 0.30),
-    # Benchmarks por categoría de costes fijos
-    "Estructura": (0.05, 0.07),
-    "Alquiler": (0.02, 0.03),
-    "Marketing": (0.02, 0.04),
-    "Suministros": (0.01, 0.02),
-    "Software interno": (0.01, 0.03),
-    "Otros": (0.005, 0.01)
-}
-
 # -------------------------------
 # Función formateo números europeos
 # -------------------------------
@@ -38,15 +23,25 @@ def format_euro(valor):
     formatted = f"{int(valor):,}".replace(",", "X").replace(".", ",").replace("X", ".")
     return f"{formatted} €"
 
-def get_estado(valor_pct, benchmark):
-    """Devuelve color e icono según benchmark"""
-    min_bm, max_bm = benchmark
-    if min_bm <= valor_pct <= max_bm:
-        return COLOR_VERDE, "✅"
-    elif valor_pct < min_bm:
-        return COLOR_ROJO, "❌"
+def get_estado(kpi_name, valor, benchmark):
+    """Devuelve color e icono según tipo de KPI"""
+    min_bm, max_bm = benchmark["min"], benchmark["max"]
+    if "coste" in kpi_name.lower():
+        # En Costes menos es mejor
+        if valor < min_bm:
+            return COLOR_VERDE, "⭐"
+        elif min_bm <= valor <= max_bm:
+            return COLOR_VERDE, "✅"
+        else:
+            return COLOR_ROJO, "⚠️"
     else:
-        return COLOR_NARANJA, "⚠️"
+        # En Márgenes, Precios más es mejor
+        if valor < min_bm:
+            return COLOR_ROJO, "⚠️"
+        elif min_bm <= valor <= max_bm:
+            return COLOR_VERDE, "✅"
+        else:
+            return COLOR_NARANJA, "⭐"
 
 # -------------------------------
 # Componente KPI reutilizable
@@ -56,8 +51,8 @@ def kpi_card(nombre, valor_abs, valor_pct, benchmark=None, tooltip=None):
     color, icono = COLOR_VERDE, "✅"
     comparativa = ""
     if benchmark:
-        color, icono = get_estado(valor_pct, benchmark)
-        comparativa = f"<br><small>Benchmark: {int(benchmark[0]*100)}–{int(benchmark[1]*100)}%</small>"
+        color, icono = get_estado(nombre, valor_abs, benchmark)
+        comparativa = f"<br><small>Benchmark: {format_euro(benchmark['min'])} – {format_euro(benchmark['max'])}</small>"
 
     html = f"""
     <div class="kpi-card" style="background-color:{COLOR_GRIS}; 
@@ -79,16 +74,17 @@ def kpi_card(nombre, valor_abs, valor_pct, benchmark=None, tooltip=None):
 # -------------------------------
 with open('presupuesto_it_2025.json') as f:
     data = json.load(f)
-
 param = data['parametros']
 result = data['resultados']
 
+with open('data/benchmarks_it.json') as f:
+    benchmarks = json.load(f)
+
 # -------------------------------
-# Ajustes iniciales: Costes Fijos
+# Ajustes iniciales
 # -------------------------------
-costes_fijos_detalle = {}
-for categoria, valor in param['costes_fijos'].items():
-    costes_fijos_detalle[categoria] = valor
+facturacion = int(result['facturacion_total'])
+costes_fijos = sum(param['costes_fijos'].values())
 
 # -------------------------------
 # Pantalla dividida
@@ -96,102 +92,101 @@ for categoria, valor in param['costes_fijos'].items():
 col_izq, col_der = st.columns([1, 1.5])  # Columna izquierda más estrecha
 
 # -------------------------------
-# Columna Izquierda: Ajustes
+# Columna Izquierda: Línea Servicios
 # -------------------------------
 with col_izq:
-    st.header("🔧 Ajustes - Costes Fijos")
-    st.markdown("Ajusta cada partida para ver impacto en resultados.")
+    with st.expander("🔽 Servicios (Haz clic para ajustar)", expanded=False):
+        st.markdown("Ajusta las variables de la línea Servicios:")
 
-    cols = st.columns(2)
-    for idx, (categoria, valor) in enumerate(costes_fijos_detalle.items()):
-        with cols[idx % 2]:  # Distribuye en dos columnas
-            # Slider categoría
-            nuevo_valor = st.slider(
-                f"{categoria.capitalize()} (€)",
-                min_value=0,
-                max_value=int(valor * 2),
-                value=int(valor),
-                step=1000,
-                format="%d"
-            )
-            costes_fijos_detalle[categoria] = nuevo_valor
+        # Sliders
+        precio_medio = st.slider(
+            "💵 Precio Medio Proyecto (€)", 
+            min_value=500, max_value=1000, value=750, step=50,
+            format="%d"
+        )
+        coste_persona = st.slider(
+            "👥 Coste Medio Persona (€)", 
+            min_value=40000, max_value=60000, value=50000, step=1000,
+            format="%d"
+        )
+        nivel_actividad = st.slider(
+            "🔥 Nivel de Actividad (%)", 
+            min_value=50, max_value=110, value=85, step=5,
+            format="%d%%"
+        )
 
-            # KPI categoría
-            porcentaje = nuevo_valor / result['facturacion_total']
-            benchmark_categoria = BENCHMARKS.get(categoria.capitalize())
-            kpi_card(categoria.capitalize(), nuevo_valor, porcentaje,
-                     benchmark=benchmark_categoria,
-                     tooltip=f"Coste fijo en {categoria}")
+        # KPIs
+        st.subheader("📊 KPIs Servicios")
+        servicios_facturacion = precio_medio * param['servicios']['num_proyectos']
+        servicios_costes_directos = coste_persona * param['servicios']['num_personas']
+        servicios_margen = servicios_facturacion - servicios_costes_directos
+        margen_pct = servicios_margen / servicios_facturacion
+
+        kpi_card("Facturación Servicios", servicios_facturacion, servicios_facturacion / facturacion)
+        kpi_card("Costes Directos Servicios", servicios_costes_directos, servicios_costes_directos / facturacion)
+        kpi_card("Margen Servicios", servicios_margen, margen_pct)
+
+        # Mini gráfico cascada
+        fig_servicios = go.Figure(go.Waterfall(
+            name="Servicios",
+            orientation="v",
+            measure=["relative", "relative", "total"],
+            x=["Ingresos", "Costes Directos", "Margen"],
+            textposition="outside",
+            text=[format_euro(servicios_facturacion), format_euro(-servicios_costes_directos),
+                  format_euro(servicios_margen)],
+            y=[servicios_facturacion, -servicios_costes_directos, servicios_margen],
+            connector={"line": {"color": "rgb(63, 63, 63)"}}
+        ))
+        fig_servicios.update_layout(
+            title="Gráfico Cascada - Servicios",
+            plot_bgcolor=COLOR_FONDO,
+            paper_bgcolor=COLOR_FONDO,
+            font=dict(color=COLOR_TEXTO),
+            margin=dict(l=10, r=10, t=40, b=10)
+        )
+        st.plotly_chart(fig_servicios, use_container_width=True)
 
 # -------------------------------
-# Recalcular resultados
+# Recalcular resultados globales
 # -------------------------------
-def recalcular_pyg(facturacion, costes_fijos_detalle):
-    costes_fijos = sum(costes_fijos_detalle.values())
-    costes_directos = facturacion * (result['costes_directos'] / result['facturacion_total'])
-    margen_bruto = facturacion - costes_directos
-    ebitda = margen_bruto - costes_fijos
-
-    costes_directos_pct = costes_directos / facturacion
-    margen_bruto_pct = margen_bruto / facturacion
-    costes_fijos_pct = costes_fijos / facturacion
-    ebitda_pct = ebitda / facturacion
-
-    return {
-        "costes_fijos": costes_fijos,
-        "costes_directos": costes_directos,
-        "margen_bruto": margen_bruto,
-        "ebitda": ebitda,
-        "costes_directos_pct": costes_directos_pct,
-        "margen_bruto_pct": margen_bruto_pct,
-        "costes_fijos_pct": costes_fijos_pct,
-        "ebitda_pct": ebitda_pct
-    }
-
-facturacion = int(result['facturacion_total'])
-pyg = recalcular_pyg(facturacion, costes_fijos_detalle)
+margen_bruto = facturacion - result['costes_directos']
+ebitda = margen_bruto - costes_fijos
 
 # -------------------------------
-# Columna Derecha: Resultados
+# Columna Derecha: Resultados Globales
 # -------------------------------
 with col_der:
-    st.header("📊 Resultados PyG")
-    st.markdown("Visualiza cómo afectan los ajustes al total de la empresa.")
-
+    st.header("📊 Resultados PyG Global")
     col1, col2, col3, col4, col5 = st.columns(5)
     with col1:
-        kpi_card("Facturación Total", facturacion, 1.0,
-                 tooltip="Ingresos totales estimados")
+        kpi_card("Facturación Total", facturacion, 1.0)
     with col2:
-        kpi_card("Costes Directos", pyg["costes_directos"], pyg["costes_directos_pct"], BENCHMARKS["Costes Directos"],
-                 tooltip="Costes asociados directamente a la producción de servicios")
+        kpi_card("Costes Directos", result['costes_directos'], result['costes_directos']/facturacion)
     with col3:
-        kpi_card("Margen Bruto", pyg["margen_bruto"], pyg["margen_bruto_pct"], BENCHMARKS["Margen Bruto"],
-                 tooltip="Ingresos menos costes directos")
+        kpi_card("Margen Bruto", margen_bruto, margen_bruto/facturacion)
     with col4:
-        kpi_card("Costes Fijos", pyg["costes_fijos"], pyg["costes_fijos_pct"], BENCHMARKS["Costes Fijos"],
-                 tooltip="Suma de todos los costes fijos")
+        kpi_card("Costes Fijos", costes_fijos, costes_fijos/facturacion)
     with col5:
-        kpi_card("EBITDA", pyg["ebitda"], pyg["ebitda_pct"], BENCHMARKS["EBITDA"],
-                 tooltip="Beneficio antes de intereses, impuestos, depreciaciones y amortizaciones")
+        kpi_card("EBITDA", ebitda, ebitda/facturacion)
 
-    # Gráfico cascada
-    fig = go.Figure(go.Waterfall(
-        name="PyG",
+    # Gráfico cascada global
+    fig_global = go.Figure(go.Waterfall(
+        name="PyG Global",
         orientation="v",
         measure=["relative", "relative", "relative", "total"],
         x=["Ingresos", "Costes Directos", "Costes Fijos", "EBITDA"],
         textposition="outside",
-        text=[format_euro(facturacion), format_euro(-pyg["costes_directos"]),
-              format_euro(-pyg["costes_fijos"]), format_euro(pyg["ebitda"])],
-        y=[facturacion, -pyg["costes_directos"], -pyg["costes_fijos"], pyg["ebitda"]],
+        text=[format_euro(facturacion), format_euro(-result['costes_directos']),
+              format_euro(-costes_fijos), format_euro(ebitda)],
+        y=[facturacion, -result['costes_directos'], -costes_fijos, ebitda],
         connector={"line": {"color": "rgb(63, 63, 63)"}}
     ))
-    fig.update_layout(
-        title="Cuenta de Resultados - Gráfico Cascada",
+    fig_global.update_layout(
+        title="Cuenta de Resultados - Global",
         plot_bgcolor=COLOR_FONDO,
         paper_bgcolor=COLOR_FONDO,
         font=dict(color=COLOR_TEXTO),
         margin=dict(l=10, r=10, t=40, b=10)
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig_global, use_container_width=True)
