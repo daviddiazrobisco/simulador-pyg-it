@@ -6,7 +6,7 @@ def bloque_linea(nombre_linea, datos_linea, benchmark_linea):
         col1, col2, col3 = st.columns(3)
         with col1:
             tarifa = st.slider(
-                "Tarifa (€)", 500, 2000,
+                f"{nombre_linea} - Tarifa (€)", 500, 2000,
                 int(datos_linea['tarifa']),
                 step=50,
                 key=f"{nombre_linea}_tarifa"
@@ -20,7 +20,7 @@ def bloque_linea(nombre_linea, datos_linea, benchmark_linea):
 
         with col2:
             ticket = st.slider(
-                "Ticket medio (€)", 10000, 600000,
+                f"{nombre_linea} - Ticket medio (€)", 10000, 600000,
                 int(datos_linea['ticket_medio']),
                 step=5000,
                 key=f"{nombre_linea}_ticket"
@@ -33,7 +33,7 @@ def bloque_linea(nombre_linea, datos_linea, benchmark_linea):
 
         with col3:
             unidades = st.slider(
-                "Número de proyectos", 1, 100,
+                f"{nombre_linea} - Número de proyectos", 1, 100,
                 int(datos_linea['unidades']),
                 step=1,
                 key=f"{nombre_linea}_unidades"
@@ -47,7 +47,7 @@ def bloque_linea(nombre_linea, datos_linea, benchmark_linea):
         col4, col5 = st.columns(2)
         with col4:
             personas = st.slider(
-                "Número de personas", 0, 100,
+                f"{nombre_linea} - Número de personas", 0, 100,
                 int(datos_linea['personas']),
                 step=1,
                 key=f"{nombre_linea}_personas"
@@ -60,7 +60,7 @@ def bloque_linea(nombre_linea, datos_linea, benchmark_linea):
 
         with col5:
             coste_persona = st.slider(
-                "Coste medio persona (€)", 30000, 90000,
+                f"{nombre_linea} - Coste medio persona (€)", 30000, 90000,
                 int(datos_linea['coste_medio_persona']),
                 step=1000,
                 key=f"{nombre_linea}_coste_persona"
@@ -72,7 +72,7 @@ def bloque_linea(nombre_linea, datos_linea, benchmark_linea):
             """, unsafe_allow_html=True)
 
         costes_pct = st.slider(
-            "Costes directos (%)", 0, 70,
+            f"{nombre_linea} - Costes directos (%)", 0, 70,
             int(datos_linea['costes_directos_%']),
             step=1,
             key=f"{nombre_linea}_costes_pct"
@@ -83,10 +83,18 @@ def bloque_linea(nombre_linea, datos_linea, benchmark_linea):
         </div>
         """, unsafe_allow_html=True)
 
+        # -------------------------------
         # Cálculos
-        resultados = calcular_linea(tarifa, ticket, unidades, personas, coste_persona, costes_pct, datos_linea['jornadas_por_persona'])
+        # -------------------------------
+        resultados = calcular_linea(
+            tarifa, ticket, unidades,
+            personas, coste_persona,
+            costes_pct, datos_linea['jornadas_por_persona']
+        )
 
+        # -------------------------------
         # KPIs Resumen
+        # -------------------------------
         st.markdown(f"### 📊 Resultados Línea {nombre_linea}")
         col1, col2, col3 = st.columns(3)
         with col1:
@@ -111,7 +119,9 @@ def bloque_linea(nombre_linea, datos_linea, benchmark_linea):
             </div>
             """, unsafe_allow_html=True)
 
-        # Velocímetro
+        # -------------------------------
+        # Velocímetro Nivel Actividad
+        # -------------------------------
         if resultados['nivel_actividad'] is not None:
             min_sub, media_sub, max_sub = benchmark_linea['utilizacion']
             gauge_color = COLOR_VERDE if min_sub * 100 <= resultados['nivel_actividad'] <= max_sub * 100 else COLOR_ROJO
@@ -132,7 +142,12 @@ def bloque_linea(nombre_linea, datos_linea, benchmark_linea):
             ))
             st.plotly_chart(fig_gauge, use_container_width=True)
 
+        else:
+            st.markdown("ℹ️ **Sin nivel de actividad (100% uso supuesto)**")
+
+        # -------------------------------
         # Gráfico cascada
+        # -------------------------------
         fig_cascada = go.Figure(go.Waterfall(
             name=nombre_linea,
             orientation="v",
@@ -146,14 +161,3 @@ def bloque_linea(nombre_linea, datos_linea, benchmark_linea):
             connector={"line": {"color": "rgb(63, 63, 63)"}}
         ))
         st.plotly_chart(fig_cascada, use_container_width=True)
-
-# -------------------------------
-# Ejecutar para todas las líneas
-# -------------------------------
-for linea, datos_linea in lineas_negocio.items():
-    clave_benchmark = nombre_benchmark.get(linea)
-    if not clave_benchmark:
-        st.warning(f"Benchmark no encontrado para: {linea}")
-        continue
-    benchmark_linea = benchmarks['lineas_negocio'][clave_benchmark]
-    bloque_linea(linea, datos_linea, benchmark_linea)
