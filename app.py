@@ -27,31 +27,31 @@ def format_euro(valor):
 # Función estado de alerta
 # -------------------------------
 def get_estado(valor_pct, benchmark, tipo="coste"):
-    min_bm, max_bm = benchmark
-    if tipo == "coste":
-        if valor_pct < min_bm:
-            return COLOR_ESTRELLA, "⭐"
-        elif min_bm <= valor_pct <= max_bm:
-            return COLOR_VERDE, "✅"
-        else:
-            return COLOR_NARANJA, "⚠️"
-    else:  # márgenes y EBITDA
-        if valor_pct > max_bm:
-            return COLOR_ESTRELLA, "⭐"
-        elif min_bm <= valor_pct <= max_bm:
-            return COLOR_VERDE, "✅"
-        else:
-            return COLOR_NARANJA, "⚠️"
+    if benchmark:
+        min_bm, max_bm = benchmark
+        if tipo == "coste":
+            if valor_pct < min_bm:
+                return COLOR_ESTRELLA, "⭐"
+            elif min_bm <= valor_pct <= max_bm:
+                return COLOR_VERDE, "✅"
+            else:
+                return COLOR_NARANJA, "⚠️"
+        else:  # márgenes y EBITDA
+            if valor_pct > max_bm:
+                return COLOR_ESTRELLA, "⭐"
+            elif min_bm <= valor_pct <= max_bm:
+                return COLOR_VERDE, "✅"
+            else:
+                return COLOR_NARANJA, "⚠️"
+    else:
+        return COLOR_TEXTO, ""  # Sin símbolo ni color si no hay benchmark
 
 # -------------------------------
 # Componente KPI reutilizable
 # -------------------------------
 def kpi_card(nombre, valor_abs, valor_pct, benchmark=None, tipo="coste", tooltip=None):
-    """Genera una tarjeta KPI con color dinámico y popup"""
-    color, icono = COLOR_VERDE, "✅"
-    comparativa = ""
+    color, icono = get_estado(valor_pct, benchmark, tipo)
     if benchmark:
-        color, icono = get_estado(valor_pct, benchmark, tipo)
         comparativa = f"<br><small>Benchmark: {int(benchmark[0]*100)}–{int(benchmark[1]*100)}%</small>"
     else:
         comparativa = "<br><small>Sin benchmark definido</small>"
@@ -99,46 +99,56 @@ st.markdown("Ajusta los parámetros para analizar el impacto en resultados.")
 linea = param['lineas_negocio']['Implantación']
 benchmark_linea = benchmarks['lineas_negocio'].get(mapa_lineas_benchmark['Implantación'])
 
-# Sliders sobre KPI
-st.subheader("🎛️ Ajustes de Implantación")
+# Sliders sobre KPI en una sola fila
+cols = st.columns(4)
 # Ticket Medio
-nuevo_ticket = st.slider("Ticket Medio (€)", 
-                         min_value=int(linea['ticket_medio'] * 0.5),
-                         max_value=int(linea['ticket_medio'] * 1.5),
-                         value=int(linea['ticket_medio']),
-                         step=1000,
-                         format="%d")
-kpi_card("Ticket Medio", nuevo_ticket, nuevo_ticket / facturacion_total, 
-         benchmark=(benchmark_linea['precio_jornada'][0]/facturacion_total,
-                    benchmark_linea['precio_jornada'][2]/facturacion_total),
-         tooltip="Valor medio por proyecto")
+with cols[0]:
+    nuevo_ticket = st.slider("Ticket Medio (€)", 
+                             min_value=int(linea['ticket_medio'] * 0.5),
+                             max_value=int(linea['ticket_medio'] * 1.5),
+                             value=int(linea['ticket_medio']),
+                             step=1000,
+                             format="%d")
+    kpi_card("Ticket Medio", nuevo_ticket, nuevo_ticket / facturacion_total,
+             tooltip="Valor medio por proyecto")
 
 # Unidades
-nuevo_unidades = st.slider("Número de Unidades", 
-                           min_value=0, max_value=int(linea['unidades']*2),
-                           value=int(linea['unidades']), step=1)
-kpi_card("Número de Unidades", nuevo_unidades * nuevo_ticket, 
-         (nuevo_unidades * nuevo_ticket)/facturacion_total,
-         tooltip="Número de proyectos o ventas")
+with cols[1]:
+    nuevo_unidades = st.slider("Número de Unidades", 
+                               min_value=0, max_value=int(linea['unidades']*2),
+                               value=int(linea['unidades']), step=1)
+    kpi_card("Número de Unidades", nuevo_unidades, nuevo_unidades / facturacion_total,
+             tooltip="Proyectos o ventas")
 
 # Personas
-nuevo_personas = st.slider("Personas", 
-                           min_value=0, max_value=int(linea['personas']*2),
-                           value=int(linea['personas']), step=1)
-kpi_card("Personas", nuevo_personas * linea['coste_medio_persona'], 
-         (nuevo_personas * linea['coste_medio_persona'])/facturacion_total,
-         tooltip="Coste de personal asignado")
+with cols[2]:
+    nuevo_personas = st.slider("Personas", 
+                               min_value=0, max_value=int(linea['personas']*2),
+                               value=int(linea['personas']), step=1)
+    kpi_card("Personas", nuevo_personas, nuevo_personas / facturacion_total,
+             tooltip="Número de personas asignadas")
+
+# Coste Medio por Persona
+with cols[3]:
+    nuevo_coste_medio = st.slider("Coste Medio Persona (€)", 
+                                  min_value=int(linea['coste_medio_persona'] * 0.8),
+                                  max_value=int(linea['coste_medio_persona'] * 1.2),
+                                  value=int(linea['coste_medio_persona']),
+                                  step=1000,
+                                  format="%d")
+    kpi_card("Coste Medio Persona", nuevo_coste_medio, (nuevo_coste_medio*nuevo_personas)/facturacion_total,
+             tooltip="Coste anual medio por persona")
 
 # -------------------------------
 # Cálculos resultados
 # -------------------------------
 facturacion_linea = nuevo_ticket * nuevo_unidades
-costes_personal = nuevo_personas * linea['coste_medio_persona']
+costes_personal = nuevo_personas * nuevo_coste_medio
 costes_directos_pct = linea['costes_directos_%']
 costes_directos = facturacion_linea * (costes_directos_pct / 100) + costes_personal
 margen_bruto = facturacion_linea - costes_directos
 
-# KPIs resultados
+# KPIs resultados en una línea
 st.subheader("📊 KPIs Resultados")
 col1, col2, col3 = st.columns(3)
 with col1:
@@ -147,13 +157,13 @@ with col1:
 with col2:
     kpi_card("Costes Directos", costes_directos, costes_directos/facturacion_total,
              benchmark=(benchmark_linea['margen_bruto'][0],
-                        benchmark_linea['margen_bruto'][2]),
+                        benchmark_linea['margen_bruto'][2]) if benchmark_linea else None,
              tipo="coste",
              tooltip="Costes directos de la línea")
 with col3:
     kpi_card("Margen Bruto", margen_bruto, margen_bruto/facturacion_total,
              benchmark=(benchmark_linea['margen_bruto'][0],
-                        benchmark_linea['margen_bruto'][2]),
+                        benchmark_linea['margen_bruto'][2]) if benchmark_linea else None,
              tipo="margen",
              tooltip="Ingresos menos costes directos")
 
@@ -164,20 +174,21 @@ st.subheader("⏱️ Nivel de Actividad")
 if linea['jornadas_por_persona'] > 0 and nuevo_personas > 0:
     jornadas_disponibles = nuevo_personas * linea['jornadas_por_persona']
     jornadas_utilizadas = (facturacion_linea / linea['tarifa'])
-    nivel_utilizacion = jornadas_utilizadas / jornadas_disponibles
+    nivel_utilizacion = jornadas_utilizadas / jornadas_disponibles * 100
+    benchmark_util = benchmark_linea['utilizacion'] if benchmark_linea else [0.6, 0.75]
 
     # Velocímetro
     fig_gauge = go.Figure(go.Indicator(
         mode="gauge+number",
-        value=nivel_utilizacion * 100,
+        value=nivel_utilizacion,
         title={'text': "Utilización (%)"},
         gauge={
             'axis': {'range': [0, 120]},
             'bar': {'color': COLOR_NARANJA},
             'steps': [
-                {'range': [0, subactividad_permitida*100], 'color': COLOR_ESTRELLA},
-                {'range': [subactividad_permitida*100, 100], 'color': COLOR_VERDE},
-                {'range': [100, 120], 'color': COLOR_ROJO}
+                {'range': [0, benchmark_util[0]*100], 'color': COLOR_ESTRELLA},
+                {'range': [benchmark_util[0]*100, benchmark_util[1]*100], 'color': COLOR_VERDE},
+                {'range': [benchmark_util[1]*100, 120], 'color': COLOR_ROJO}
             ]
         }
     ))
@@ -187,10 +198,10 @@ if linea['jornadas_por_persona'] > 0 and nuevo_personas > 0:
     st.markdown(f"""
     📅 **Jornadas disponibles:** {int(jornadas_disponibles)}  
     ✅ **Jornadas utilizadas:** {int(jornadas_utilizadas)}  
-    📊 **% Jornadas utilizadas:** {nivel_utilizacion*100:.1f}%  
+    📊 **% Jornadas utilizadas:** {nivel_utilizacion:.1f}%  
     🔄 **Subactividad asumible ({int(subactividad_permitida*100)}%):** {int(jornadas_disponibles*subactividad_permitida)} jornadas  
     🚨 **Exceso Subactividad:** {max(0, int(jornadas_disponibles - jornadas_utilizadas - jornadas_disponibles*subactividad_permitida))} jornadas  
-    💸 **Coste asociado:** {format_euro(max(0, (jornadas_disponibles - jornadas_utilizadas - jornadas_disponibles*subactividad_permitida)*linea['coste_medio_persona']/linea['jornadas_por_persona']))}
+    💸 **Coste asociado:** {format_euro(max(0, (jornadas_disponibles - jornadas_utilizadas - jornadas_disponibles*subactividad_permitida)*nuevo_coste_medio/linea['jornadas_por_persona']))}
     """)
 else:
     st.markdown("⚡ Sin nivel de actividad (100% uso supuesto)")
