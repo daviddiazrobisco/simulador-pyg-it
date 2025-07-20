@@ -11,12 +11,19 @@ with open('data/benchmarks_it.json') as f:
 with open('data/presupuesto_it_2025.json') as f:
     data = json.load(f)
 
-# Mapeo entre nombres de presupuesto y benchmark
+# -------------------------------
+# Mapeo nombres presupuesto -> benchmark
+# -------------------------------
 nombre_benchmark = {
-    "Implantación": "consultoria",
+    "Implantacion": "consultoria",  # sin tilde
     "Licencias": "software",
-    "Hot line": "mixto"
+    "Hot Line": "mixto"
 }
+
+# -------------------------------
+# Normalizar claves líneas de negocio
+# -------------------------------
+lineas_negocio = {k.strip().title(): v for k, v in data['parametros']['lineas_negocio'].items()}
 
 # -------------------------------
 # Funciones auxiliares
@@ -151,7 +158,7 @@ def bloque_linea(nombre_linea, datos_linea, benchmark_linea):
 # -------------------------------
 # Crear bloques para cada línea
 # -------------------------------
-for linea in data['parametros']['lineas_negocio']:
-    datos_linea = data['parametros']['lineas_negocio'][linea]
-    benchmark_linea = benchmarks['lineas_negocio'][nombre_benchmark[linea]]
+for linea, datos_linea in lineas_negocio.items():
+    clave_benchmark = nombre_benchmark.get(linea.replace("á", "a"))
+    benchmark_linea = benchmarks['lineas_negocio'][clave_benchmark]
     bloque_linea(linea, datos_linea, benchmark_linea)
