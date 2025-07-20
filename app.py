@@ -30,15 +30,26 @@ def format_euro(valor):
 
 def get_estado(valor, benchmark, tipo='mas_es_mejor'):
     """Devuelve símbolo y color según comparación con benchmark"""
-    min_val, media_val, max_val = benchmark
-    if tipo == 'mas_es_mejor':
-        if valor < min_val: return "⚠️", COLOR_ROJO
-        elif valor <= max_val: return "✅", COLOR_VERDE
-        else: return "⭐", COLOR_NARANJA
-    else:
-        if valor > max_val: return "⚠️", COLOR_ROJO
-        elif valor >= min_val: return "✅", COLOR_VERDE
-        else: return "⭐", COLOR_NARANJA
+    if len(benchmark) == 2:  # (min, max)
+        min_val, max_val = benchmark
+        if tipo == 'mas_es_mejor':
+            if valor < min_val: return "⚠️", COLOR_ROJO
+            elif valor <= max_val: return "✅", COLOR_VERDE
+            else: return "⭐", COLOR_NARANJA
+        else:  # menos es mejor
+            if valor > max_val: return "⚠️", COLOR_ROJO
+            elif valor >= min_val: return "✅", COLOR_VERDE
+            else: return "⭐", COLOR_NARANJA
+    else:  # (min, media, max)
+        min_val, media_val, max_val = benchmark
+        if tipo == 'mas_es_mejor':
+            if valor < min_val: return "⚠️", COLOR_ROJO
+            elif valor <= max_val: return "✅", COLOR_VERDE
+            else: return "⭐", COLOR_NARANJA
+        else:  # menos es mejor
+            if valor > max_val: return "⚠️", COLOR_ROJO
+            elif valor >= min_val: return "✅", COLOR_VERDE
+            else: return "⭐", COLOR_NARANJA
 
 def calcular_linea(tarifa, ticket, unidades, personas, coste_persona, costes_directos_pct, jornadas_persona):
     facturacion = ticket * unidades
@@ -91,7 +102,8 @@ facturacion_objetivo = data['parametros']['facturacion_objetivo']
 def kpi_card(nombre, valor_abs, valor_pct, benchmark=None, tooltip=None):
     color, icono = COLOR_VERDE, "✅"
     if benchmark:
-        color, icono = get_estado(valor_pct, benchmark, 'menos_es_mejor' if 'Coste' in nombre else 'mas_es_mejor')
+        sentido = 'menos_es_mejor' if 'Coste' in nombre else 'mas_es_mejor'
+        color, icono = get_estado(valor_pct, benchmark, sentido)
     comparativa = f"<br><small>{round(valor_pct*100,1)}% sobre ventas</small>"
 
     html = f"""
@@ -108,21 +120,15 @@ def kpi_card(nombre, valor_abs, valor_pct, benchmark=None, tooltip=None):
     st.markdown(html, unsafe_allow_html=True)
 
 # -------------------------------
-# Bloque Costes Fijos
+# Mostrar Costes Fijos (sin sliders)
 # -------------------------------
-st.header("🏢 Ajuste Detallado de Costes Fijos")
+st.header("🏢 Detalle de Costes Fijos")
 cols = st.columns(len(costes_fijos_detalle))
 for idx, (categoria, valor) in enumerate(costes_fijos_detalle.items()):
     with cols[idx]:
-        nuevo_valor = st.slider(
-            f"{categoria} (€)", 0, int(valor * 2),
-            int(valor), step=1000,
-            key=f"costes_fijos_{categoria}"
-        )
-        costes_fijos_detalle[categoria] = nuevo_valor
-        porcentaje = nuevo_valor / facturacion_objetivo
+        porcentaje = valor / facturacion_objetivo
         benchmark_cat = benchmarks['global']['costes_fijos']
-        kpi_card(categoria, nuevo_valor, porcentaje, benchmark=benchmark_cat, tooltip=f"Coste fijo en {categoria}")
+        kpi_card(categoria, valor, porcentaje, benchmark=benchmark_cat, tooltip=f"Coste fijo en {categoria}")
 
 total_costes_fijos = sum(costes_fijos_detalle.values())
 
@@ -147,10 +153,10 @@ def bloque_linea(nombre_linea, datos_linea, benchmark_linea):
         # KPIs Resumen
         st.subheader("📊 Resultados")
         kpi_card("Facturación", resultados['facturacion'], resultados['facturacion']/facturacion_objetivo, benchmark_linea['precio_jornada'])
-        kpi_card("Costes Directos", resultados['costes_directos'], resultados['costes_directos']/facturacion_objetivo, benchmark_linea['margen_bruto'])
-        kpi_card("Margen Bruto", resultados['margen_bruto'], resultados['margen_bruto']/facturacion_objetivo, benchmark_linea['ebitda'])
+        kpi_card("Costes Directos", resultados['costes_directos'], resultados['costes_directos']/resultados['facturacion'], benchmark_linea['margen_bruto'])
+        kpi_card("Margen Bruto", resultados['margen_bruto'], resultados['margen_bruto']/resultados['facturacion'], benchmark_linea['ebitda'])
 
-        # Velocímetro y Cascada
+        # Velocímetro
         if resultados['nivel_actividad'] is not None:
             fig_gauge = go.Figure(go.Indicator(
                 mode="gauge+number",
@@ -160,6 +166,7 @@ def bloque_linea(nombre_linea, datos_linea, benchmark_linea):
             ))
             st.plotly_chart(fig_gauge, use_container_width=True)
 
+        # Cascada
         fig_cascada = go.Figure(go.Waterfall(
             name=nombre_linea,
             orientation="v",
