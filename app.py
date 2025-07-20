@@ -91,16 +91,47 @@ for categoria, valor in param['costes_fijos'].items():
     costes_fijos_detalle[categoria] = valor
 
 # -------------------------------
-# Cálculos dinámicos
+# Pantalla dividida
+# -------------------------------
+col_izq, col_der = st.columns([1, 1.5])  # Columna izquierda más estrecha
+
+# -------------------------------
+# Columna Izquierda: Ajustes
+# -------------------------------
+with col_izq:
+    st.header("🔧 Ajustes - Costes Fijos")
+    st.markdown("Ajusta cada partida para ver impacto en resultados.")
+
+    cols = st.columns(2)
+    for idx, (categoria, valor) in enumerate(costes_fijos_detalle.items()):
+        with cols[idx % 2]:  # Distribuye en dos columnas
+            # Slider categoría
+            nuevo_valor = st.slider(
+                f"{categoria.capitalize()} (€)",
+                min_value=0,
+                max_value=int(valor * 2),
+                value=int(valor),
+                step=1000,
+                format="%d"
+            )
+            costes_fijos_detalle[categoria] = nuevo_valor
+
+            # KPI categoría
+            porcentaje = nuevo_valor / result['facturacion_total']
+            benchmark_categoria = BENCHMARKS.get(categoria.capitalize())
+            kpi_card(categoria.capitalize(), nuevo_valor, porcentaje,
+                     benchmark=benchmark_categoria,
+                     tooltip=f"Coste fijo en {categoria}")
+
+# -------------------------------
+# Recalcular resultados
 # -------------------------------
 def recalcular_pyg(facturacion, costes_fijos_detalle):
-    # Totales
     costes_fijos = sum(costes_fijos_detalle.values())
     costes_directos = facturacion * (result['costes_directos'] / result['facturacion_total'])
     margen_bruto = facturacion - costes_directos
     ebitda = margen_bruto - costes_fijos
 
-    # Porcentajes
     costes_directos_pct = costes_directos / facturacion
     margen_bruto_pct = margen_bruto / facturacion
     costes_fijos_pct = costes_fijos / facturacion
@@ -117,86 +148,50 @@ def recalcular_pyg(facturacion, costes_fijos_detalle):
         "ebitda_pct": ebitda_pct
     }
 
-# -------------------------------
-# Facturación fija por ahora
-# -------------------------------
 facturacion = int(result['facturacion_total'])
-
-# -------------------------------
-# KPIs Principales
-# -------------------------------
 pyg = recalcular_pyg(facturacion, costes_fijos_detalle)
 
-st.title("💻 Simulador PyG Financiero para Empresa IT")
-st.markdown("Ajusta las partidas de costes fijos y observa el impacto en tiempo real.")
-
-col1, col2, col3, col4, col5 = st.columns(5)
-
-with col1:
-    kpi_card("Facturación Total", facturacion, 1.0, tooltip="Ingresos totales estimados")
-
-with col2:
-    kpi_card("Costes Directos", pyg["costes_directos"], pyg["costes_directos_pct"], BENCHMARKS["Costes Directos"],
-             tooltip="Costes asociados directamente a la producción de servicios")
-
-with col3:
-    kpi_card("Margen Bruto", pyg["margen_bruto"], pyg["margen_bruto_pct"], BENCHMARKS["Margen Bruto"],
-             tooltip="Ingresos menos costes directos")
-
-with col4:
-    kpi_card("Costes Fijos", pyg["costes_fijos"], pyg["costes_fijos_pct"], BENCHMARKS["Costes Fijos"],
-             tooltip="Costes de estructura y operativos")
-
-with col5:
-    kpi_card("EBITDA", pyg["ebitda"], pyg["ebitda_pct"], BENCHMARKS["EBITDA"],
-             tooltip="Beneficio antes de intereses, impuestos, depreciaciones y amortizaciones")
-
 # -------------------------------
-# Gráfico cascada
+# Columna Derecha: Resultados
 # -------------------------------
-fig = go.Figure(go.Waterfall(
-    name="PyG",
-    orientation="v",
-    measure=["relative", "relative", "relative", "total"],
-    x=["Ingresos", "Costes Directos", "Costes Fijos", "EBITDA"],
-    textposition="outside",
-    text=[format_euro(facturacion), format_euro(-pyg["costes_directos"]),
-          format_euro(-pyg["costes_fijos"]), format_euro(pyg["ebitda"])],
-    y=[facturacion, -pyg["costes_directos"], -pyg["costes_fijos"], pyg["ebitda"]],
-    connector={"line": {"color": "rgb(63, 63, 63)"}}
-))
-fig.update_layout(
-    title="Cuenta de Resultados - Gráfico Cascada",
-    plot_bgcolor=COLOR_FONDO,
-    paper_bgcolor=COLOR_FONDO,
-    font=dict(color=COLOR_TEXTO),
-    margin=dict(l=10, r=10, t=40, b=10)
-)
-st.plotly_chart(fig, use_container_width=True)
+with col_der:
+    st.header("📊 Resultados PyG")
+    st.markdown("Visualiza cómo afectan los ajustes al total de la empresa.")
 
-# -------------------------------
-# Bloque Costes Fijos con sliders + KPI
-# -------------------------------
-st.header("🏢 Ajuste Detallado de Costes Fijos")
-st.markdown("Ajusta cada partida y observa el impacto en EBITDA y otros indicadores.")
+    col1, col2, col3, col4, col5 = st.columns(5)
+    with col1:
+        kpi_card("Facturación Total", facturacion, 1.0,
+                 tooltip="Ingresos totales estimados")
+    with col2:
+        kpi_card("Costes Directos", pyg["costes_directos"], pyg["costes_directos_pct"], BENCHMARKS["Costes Directos"],
+                 tooltip="Costes asociados directamente a la producción de servicios")
+    with col3:
+        kpi_card("Margen Bruto", pyg["margen_bruto"], pyg["margen_bruto_pct"], BENCHMARKS["Margen Bruto"],
+                 tooltip="Ingresos menos costes directos")
+    with col4:
+        kpi_card("Costes Fijos", pyg["costes_fijos"], pyg["costes_fijos_pct"], BENCHMARKS["Costes Fijos"],
+                 tooltip="Suma de todos los costes fijos")
+    with col5:
+        kpi_card("EBITDA", pyg["ebitda"], pyg["ebitda_pct"], BENCHMARKS["EBITDA"],
+                 tooltip="Beneficio antes de intereses, impuestos, depreciaciones y amortizaciones")
 
-cols = st.columns(len(costes_fijos_detalle))
-for idx, (categoria, valor) in enumerate(costes_fijos_detalle.items()):
-    with cols[idx]:
-        # Slider categoría
-        nuevo_valor = st.slider(
-            f"Ajustar {categoria.capitalize()} (€)",
-            min_value=0,
-            max_value=int(valor * 2),
-            value=int(valor),
-            step=1000,
-            format="%d"
-        )
-        costes_fijos_detalle[categoria] = nuevo_valor
-
-        # KPI categoría
-        porcentaje = nuevo_valor / facturacion
-        benchmark_categoria = BENCHMARKS.get(categoria.capitalize())
-        kpi_card(categoria.capitalize(), nuevo_valor, porcentaje,
-                 benchmark=benchmark_categoria,
-                 tooltip=f"Coste fijo en {categoria}")
+    # Gráfico cascada
+    fig = go.Figure(go.Waterfall(
+        name="PyG",
+        orientation="v",
+        measure=["relative", "relative", "relative", "total"],
+        x=["Ingresos", "Costes Directos", "Costes Fijos", "EBITDA"],
+        textposition="outside",
+        text=[format_euro(facturacion), format_euro(-pyg["costes_directos"]),
+              format_euro(-pyg["costes_fijos"]), format_euro(pyg["ebitda"])],
+        y=[facturacion, -pyg["costes_directos"], -pyg["costes_fijos"], pyg["ebitda"]],
+        connector={"line": {"color": "rgb(63, 63, 63)"}}
+    ))
+    fig.update_layout(
+        title="Cuenta de Resultados - Gráfico Cascada",
+        plot_bgcolor=COLOR_FONDO,
+        paper_bgcolor=COLOR_FONDO,
+        font=dict(color=COLOR_TEXTO),
+        margin=dict(l=10, r=10, t=40, b=10)
+    )
+    st.plotly_chart(fig, use_container_width=True)
