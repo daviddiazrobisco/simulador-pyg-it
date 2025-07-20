@@ -1,17 +1,29 @@
 {
-  "Servicios": {
-    "Precio Medio Proyecto": { "min": 650, "media": 750, "max": 850 },
-    "Coste Medio Persona": { "min": 42000, "media": 50000, "max": 58000 },
-    "Nivel Actividad": { "min": 75, "media": 85, "max": 95 }
+  "global": {
+    "costes_directos": [0.50, 0.55],
+    "margen_bruto": [0.45, 0.50],
+    "costes_fijos": [0.15, 0.20],
+    "ebitda": [0.25, 0.30],
+    "nivel_subactividad": [0.15, 0.20]
   },
-  "Productos": {
-    "Precio Medio Proyecto": { "min": 1100, "media": 1250, "max": 1400 },
-    "Coste Medio Persona": { "min": 48000, "media": 55000, "max": 62000 },
-    "Nivel Actividad": { "min": 70, "media": 80, "max": 90 }
-  },
-  "Soporte": {
-    "Precio Medio Proyecto": { "min": 400, "media": 500, "max": 600 },
-    "Coste Medio Persona": { "min": 39000, "media": 46000, "max": 53000 },
-    "Nivel Actividad": { "min": 80, "media": 90, "max": 100 }
+  "lineas_negocio": {
+    "consultoria": {
+      "precio_jornada": [600, 700, 800],
+      "margen_bruto": [0.18, 0.24, 0.30],
+      "ebitda": [0.10, 0.15, 0.20],
+      "utilizacion": [0.60, 0.68, 0.75]
+    },
+    "software": {
+      "precio_jornada": [800, 1200, 2000],
+      "margen_bruto": [0.50, 0.60, 0.75],
+      "ebitda": [0.20, 0.30, 0.40],
+      "utilizacion": [0.65, 0.70, 0.80]
+    },
+    "mixto": {
+      "precio_jornada": [700, 1000, 1500],
+      "margen_bruto": [0.30, 0.40, 0.50],
+      "ebitda": [0.15, 0.25, 0.35],
+      "utilizacion": [0.60, 0.70, 0.78]
+    }
   }
 }
