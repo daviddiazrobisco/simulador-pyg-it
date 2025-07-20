@@ -77,6 +77,9 @@ with open('presupuesto_it_2025.json') as f:
 param = data['parametros']
 result = data['resultados']
 
+# Normalizar claves a minúsculas
+param_lower = {k.lower(): v for k, v in param.items()}
+
 with open('data/benchmarks_it.json') as f:
     benchmarks = json.load(f)
 
@@ -115,16 +118,23 @@ with col_izq:
             format="%d%%"
         )
 
-        # KPIs
-        st.subheader("📊 KPIs Servicios")
-        servicios_facturacion = precio_medio * param['servicios']['num_proyectos']
-        servicios_costes_directos = coste_persona * param['servicios']['num_personas']
-        servicios_margen = servicios_facturacion - servicios_costes_directos
-        margen_pct = servicios_margen / servicios_facturacion
+        # Datos de Servicios desde JSON (insensible a mayúsculas)
+        servicios_data = param_lower.get('servicios', {})
+        num_proyectos = servicios_data.get('num_proyectos', 0)
+        num_personas = servicios_data.get('num_personas', 0)
 
+        # KPIs calculados
+        servicios_facturacion = precio_medio * num_proyectos
+        servicios_costes_directos = coste_persona * num_personas
+        servicios_margen = servicios_facturacion - servicios_costes_directos
+        margen_pct = servicios_margen / servicios_facturacion if servicios_facturacion else 0
+
+        st.subheader("📊 KPIs Servicios")
         kpi_card("Facturación Servicios", servicios_facturacion, servicios_facturacion / facturacion)
-        kpi_card("Costes Directos Servicios", servicios_costes_directos, servicios_costes_directos / facturacion)
-        kpi_card("Margen Servicios", servicios_margen, margen_pct)
+        kpi_card("Costes Directos Servicios", servicios_costes_directos, servicios_costes_directos / facturacion,
+                 benchmark=benchmarks["Servicios"]["Coste Medio Persona"])
+        kpi_card("Margen Servicios", servicios_margen, margen_pct,
+                 benchmark=benchmarks["Servicios"]["Precio Medio Proyecto"])
 
         # Mini gráfico cascada
         fig_servicios = go.Figure(go.Waterfall(
