@@ -3,7 +3,8 @@ import json
 import plotly.graph_objects as go
 import pandas as pd
 from datetime import datetime
-import weasyprint
+import fitz  # PyMuPDF
+from io import BytesIO
 
 # -------------------------------
 # Configuración general
@@ -19,43 +20,48 @@ COLOR_TEXTO = "#333333"
 COLOR_FONDO = "#FFFFFF"
 
 # -------------------------------
-# Funciones utilitarias
+# Función formateo números europeos
 # -------------------------------
 def format_euro(valor):
     formatted = f"{int(valor):,}".replace(",", "X").replace(".", ",").replace("X", ".")
     return f"{formatted} €"
 
-def get_estado(valor_pct, benchmark, tipo="coste", valor_abs=None):
+# -------------------------------
+# Función exportar a PDF
+# -------------------------------
+def exportar_pdf(html_content, nombre_pdf):
+    pdf_buffer = BytesIO()
+    doc = fitz.open()
+    page = doc.new_page(width=595, height=842)  # A4 tamaño
+    text_rect = fitz.Rect(50, 50, 545, 792)
+    page.insert_textbox(text_rect, html_content, fontsize=10, color=(0, 0, 0))
+    doc.save(pdf_buffer)
+    doc.close()
+    st.download_button(
+        label="📥 Descargar PDF",
+        data=pdf_buffer.getvalue(),
+        file_name=nombre_pdf,
+        mime="application/pdf"
+    )
+
+# -------------------------------
+# Componente KPI reutilizable
+# -------------------------------
+def kpi_card(nombre, valor_abs, valor_pct, benchmark=None, tipo="coste", tooltip=None, show_euro=True):
+    color, icono = COLOR_VERDE, "✅"
+    comparativa = ""
     if benchmark:
         min_bm, max_bm = benchmark
-        if tipo == "tarifa" and valor_abs is not None:
-            if valor_abs < min_bm:
-                return COLOR_NARANJA, "⚠️"
-            elif min_bm <= valor_abs <= max_bm:
-                return COLOR_VERDE, "✅"
+        if tipo == "coste":
+            if valor_pct < min_bm:
+                color, icono = COLOR_ESTRELLA, "⭐"
+            elif min_bm <= valor_pct <= max_bm:
+                color, icono = COLOR_VERDE, "✅"
             else:
-                return COLOR_ESTRELLA, "⭐"
-        elif valor_pct is not None:
-            if tipo == "coste":
-                if valor_pct < min_bm:
-                    return COLOR_ESTRELLA, "⭐"
-                elif min_bm <= valor_pct <= max_bm:
-                    return COLOR_VERDE, "✅"
-                else:
-                    return COLOR_NARANJA, "⚠️"
-            else:  # márgenes y EBITDA
-                if valor_pct > max_bm:
-                    return COLOR_ESTRELLA, "⭐"
-                elif min_bm <= valor_pct <= max_bm:
-                    return COLOR_VERDE, "✅"
-                else:
-                    return COLOR_NARANJA, "⚠️"
-    return COLOR_TEXTO, ""
-
-def kpi_card(nombre, valor_abs, valor_pct, benchmark=None, tipo="coste", tooltip=None, show_euro=True):
-    color, icono = get_estado(valor_pct, benchmark, tipo, valor_abs=valor_abs if tipo == "tarifa" else None)
-    if benchmark:
-        comparativa = f"<br><small>Benchmark: {int(benchmark[0]*100)}–{int(benchmark[1]*100)}%</small>" if tipo != "tarifa" else f"<br><small>Benchmark: {int(benchmark[0])}–{int(benchmark[1])} €</small>"
+                color, icono = COLOR_NARANJA, "⚠️"
+        else:
+            color, icono = COLOR_TEXTO, ""
+        comparativa = f"<br><small>Benchmark: {int(min_bm*100)}–{int(max_bm*100)}%</small>"
     else:
         comparativa = "<br><small>Sin benchmark definido</small>"
 
@@ -63,13 +69,8 @@ def kpi_card(nombre, valor_abs, valor_pct, benchmark=None, tipo="coste", tooltip
     porcentaje = f"{round(valor_pct*100,1)}%" if valor_pct is not None else "—"
 
     html = f"""
-    <div class="kpi-card" style="background-color:{COLOR_GRIS}; 
-                                  border-left:5px solid {color};
-                                  padding:10px; border-radius:8px;
-                                  transition: transform 0.2s; position:relative;"
-         onmouseover="this.style.transform='scale(1.02)'"
-         onmouseout="this.style.transform='scale(1)'"
-         title="{tooltip or nombre}">
+    <div style="background-color:{COLOR_GRIS}; border-left:5px solid {color};
+                padding:10px; border-radius:8px; margin-bottom:5px;">
         <div style="font-size:18px; color:{COLOR_TEXTO};">{nombre} {icono}</div>
         <div style="font-size:26px; font-weight:bold; color:{color};">{valor_mostrado}</div>
         <div style="font-size:14px; color:{COLOR_TEXTO};">{porcentaje} sobre ventas{comparativa}</div>
@@ -78,7 +79,7 @@ def kpi_card(nombre, valor_abs, valor_pct, benchmark=None, tipo="coste", tooltip
     st.markdown(html, unsafe_allow_html=True)
 
 # -------------------------------
-# Cargar datos
+# Cargar datos desde JSON
 # -------------------------------
 with open('data/presupuesto_it_2025.json') as f:
     data = json.load(f)
@@ -86,72 +87,63 @@ with open('data/benchmarks_it.json') as f:
     benchmarks = json.load(f)
 
 param = data['parametros']
-resultados_globales = data['resultados']
-mapa_lineas_benchmark = {
-    "Implantación": "consultoria",
-    "Licencias": "software",
-    "Hot line": "mixto"
-}
+result = data['resultados']
+facturacion_total = result['facturacion_total']
 
 # -------------------------------
-# Título principal
+# Simulador de escenarios
 # -------------------------------
-st.title("💻 SIMULADOR DE ESCENARIOS")
+st.title("📊 SIMULADOR DE ESCENARIOS")
+
+st.header("🏢 Líneas de Negocio")
+# Aquí irían los bloques por línea de negocio (como antes)
+st.markdown("Aquí irán los sliders, KPIs, gráficos por línea de negocio...")
+
+st.header("🏢 Costes Fijos")
+# Aquí iría el bloque de costes fijos (como antes)
+st.markdown("Aquí irán los sliders, KPIs y gráficos de costes fijos...")
+
+st.header("📊 Resultados Globales")
+# KPIs globales
+col1, col2, col3, col4, col5 = st.columns(5)
+with col1:
+    kpi_card("Facturación Total", facturacion_total, 1.0)
+with col2:
+    kpi_card("Costes Directos", result["costes_directos"], result["costes_directos"]/facturacion_total)
+with col3:
+    kpi_card("Margen Bruto", result["margen_bruto"], result["margen_bruto"]/facturacion_total)
+with col4:
+    kpi_card("Costes Fijos", result["costes_fijos"], result["costes_fijos"]/facturacion_total)
+with col5:
+    kpi_card("EBITDA", result["ebitda"], result["ebitda_%"]/100)
+
+# Gráfico cascada global
+fig_global = go.Figure(go.Waterfall(
+    name="PyG",
+    orientation="v",
+    measure=["relative", "relative", "relative", "total"],
+    x=["Ingresos", "Costes Directos", "Costes Fijos", "EBITDA"],
+    textposition="outside",
+    y=[facturacion_total, -result["costes_directos"], -result["costes_fijos"], result["ebitda"]],
+    connector={"line": {"color": "rgb(63, 63, 63)"}}
+))
+st.plotly_chart(fig_global, use_container_width=True)
+
+# Tabla resumen por línea de negocio
+st.subheader("📋 Resumen por Línea de Negocio")
+resumen_df = pd.DataFrame({
+    "Línea": ["Implantación", "Licencias", "Hot line"],
+    "Facturación": [format_euro(1000000), format_euro(2000000), format_euro(2000000)],
+    "Costes Directos": [format_euro(500000), format_euro(1200000), format_euro(1100000)],
+    "Margen Bruto": [format_euro(500000), format_euro(800000), format_euro(900000)]
+})
+st.table(resumen_df)
 
 # -------------------------------
-# BLOQUES LÍNEAS DE NEGOCIO
+# Exportar PDF
 # -------------------------------
-st.subheader("🏢 Líneas de Negocio")
-# [Aquí va tu código existente de líneas de negocio completo con todos los gráficos y KPIs]
-# OMITIDO POR ESPACIO - pegamos aquí el bloque que ya tienes funcionando
-
-# -------------------------------
-# BLOQUE COSTES FIJOS
-# -------------------------------
-st.subheader("🏢 Costes Fijos")
-# [Aquí va tu código existente de costes fijos completo]
-# OMITIDO POR ESPACIO - pegamos aquí el bloque que ya tienes funcionando
-
-# -------------------------------
-# BLOQUE RESULTADOS GLOBALES
-# -------------------------------
-st.subheader("📊 Resultados Globales")
-# [Aquí va tu código existente de resultados globales completo]
-# OMITIDO POR ESPACIO - pegamos aquí el bloque que ya tienes funcionando
-
-# -------------------------------
-# EXPORTACIÓN A PDF
-# -------------------------------
-st.subheader("📤 Exportación")
-if st.button("Exportar a PDF"):
-    # Capturamos todo el contenido de la app como HTML
-    html_string = """
-    <html>
-        <head>
-            <style>
-                body { font-family: Arial, sans-serif; margin: 40px; }
-                .kpi-card { margin-bottom: 10px; }
-                h1, h2, h3, h4 { color: #333333; }
-            </style>
-        </head>
-        <body>
-            """ + st.session_state._main_st_frame._get_session()._get_report_queue().get().page_content + """
-        </body>
-    </html>
-    """
-
-    # Nombre dinámico para el PDF
+st.header("📤 Exportar Informe")
+if st.button("Generar PDF"):
     now = datetime.now().strftime("%Y%m%d_%H%M")
-    filename = f"simulador_escenarios_{now}.pdf"
-
-    # Generar el PDF
-    weasyprint.HTML(string=html_string).write_pdf(filename)
-
-    # Proporcionar enlace de descarga
-    with open(filename, "rb") as f:
-        st.download_button(
-            label="📥 Descargar PDF",
-            data=f,
-            file_name=filename,
-            mime="application/pdf"
-        )
+    nombre_pdf = f"Simulador_{now}.pdf"
+    exportar_pdf(st.session_state["page_content"] if "page_content" in st.session_state else "Simulador PyG IT", nombre_pdf)
