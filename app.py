@@ -2,17 +2,16 @@ import streamlit as st
 import json
 import plotly.graph_objects as go
 import pandas as pd
-from datetime import datetime
-from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
-from reportlab.lib.units import cm
-import io
+from reportlab.pdfgen import canvas
+from datetime import datetime
 
 # -------------------------------
 # Configuración general
 # -------------------------------
-st.set_page_config(page_title="SIMULADOR DE ESCENARIOS", page_icon="💻", layout="wide")
+st.set_page_config(page_title="Simulador de Escenarios", page_icon="💻", layout="wide")
 
+# Colores corporativos
 COLOR_VERDE = "#144C44"
 COLOR_NARANJA = "#fb9200"
 COLOR_ESTRELLA = "#FFD700"
@@ -105,53 +104,42 @@ mapa_lineas_benchmark = {
 }
 
 # -------------------------------
-# Bloques líneas de negocio y costes fijos
+# BLOQUES LÍNEAS DE NEGOCIO
 # -------------------------------
-st.title("SIMULADOR DE ESCENARIOS")
-st.header("💼 Líneas de Negocio")
 resultados_lineas = {}
+
+st.title("💻 SIMULADOR DE ESCENARIOS")
+st.subheader("📦 Líneas de Negocio")
 
 for linea_nombre, linea in param['lineas_negocio'].items():
     benchmark_linea = benchmarks['lineas_negocio'].get(mapa_lineas_benchmark[linea_nombre])
 
     with st.expander(f"🔽 {linea_nombre.upper()}", expanded=False):
-        cols = st.columns(5)
+        st.markdown("Ajusta los parámetros para analizar el impacto en resultados.")
 
-        if linea['personas'] > 0 and linea['jornadas_por_persona'] > 0:
-            with cols[0]:
-                nueva_tarifa = st.slider("Tarifa (€)", int(linea['tarifa']*0.8), int(linea['tarifa']*1.2), int(linea['tarifa']), step=10, format="%d")
-                bm_tarifa = benchmark_linea['precio_jornada'] if benchmark_linea else None
-                kpi_card("Tarifa", nueva_tarifa, None, benchmark=(bm_tarifa[0], bm_tarifa[2]) if bm_tarifa else None, tipo="tarifa", tooltip="Precio medio jornada")
+        cols = st.columns(2)
 
-            with cols[1]:
-                jornadas_x_proyecto = linea['ticket_medio'] // linea['tarifa']
-                nuevas_jornadas = st.slider("Jornadas por Proyecto", max(1, int(jornadas_x_proyecto*0.5)), int(jornadas_x_proyecto*1.5), int(jornadas_x_proyecto), step=1)
-                ticket_medio = nueva_tarifa * nuevas_jornadas
-                kpi_card("Jornadas/Proyecto", nuevas_jornadas, None, tooltip="Número medio de jornadas por proyecto", show_euro=False)
-        else:
-            with cols[0]:
-                ticket_medio = st.slider("Ticket Medio (€)", int(linea['ticket_medio']*0.5), int(linea['ticket_medio']*1.5), int(linea['ticket_medio']), step=1000, format="%d")
-                kpi_card("Ticket Medio", ticket_medio, None, tooltip="Valor medio por proyecto")
+        # Ticket Medio
+        ticket_medio = st.slider(f"{linea_nombre} - Ticket Medio (€)", 
+                                 min_value=int(linea['ticket_medio'] * 0.5),
+                                 max_value=int(linea['ticket_medio'] * 1.5),
+                                 value=int(linea['ticket_medio']),
+                                 step=1000,
+                                 format="%d")
+        kpi_card("Ticket Medio", ticket_medio, None,
+                 tooltip="Valor medio por proyecto")
 
-        with cols[2]:
-            nuevo_unidades = st.slider("Número de Unidades", 0, int(linea['unidades']*2), int(linea['unidades']), step=1)
-            kpi_card("Número de Unidades", nuevo_unidades, None, tooltip="Proyectos o ventas", show_euro=False)
+        # Unidades
+        nuevo_unidades = st.slider(f"{linea_nombre} - Número de Unidades", 
+                                   min_value=0, max_value=int(linea['unidades']*2),
+                                   value=int(linea['unidades']), step=1)
+        kpi_card("Número de Unidades", nuevo_unidades, None,
+                 tooltip="Proyectos o ventas", show_euro=False)
 
-        if linea['personas'] > 0:
-            with cols[3]:
-                nuevo_personas = st.slider("Personas", 0, int(linea['personas']*2), int(linea['personas']), step=1)
-                kpi_card("Personas", nuevo_personas, None, tooltip="Número de personas asignadas", show_euro=False)
-            with cols[4]:
-                nuevo_coste_medio = st.slider("Coste Medio Persona (€)", int(linea['coste_medio_persona']*0.8), int(linea['coste_medio_persona']*1.2), int(linea['coste_medio_persona']), step=1000, format="%d")
-                kpi_card("Coste Medio Persona", nuevo_coste_medio, None, tooltip="Coste anual medio por persona")
-        else:
-            nuevo_personas = 0
-            nuevo_coste_medio = 0
-
+        # Cálculos
         facturacion_linea = ticket_medio * nuevo_unidades
-        costes_personal = nuevo_personas * nuevo_coste_medio
         costes_directos_pct = linea['costes_directos_%']
-        costes_directos = facturacion_linea * (costes_directos_pct / 100) + costes_personal
+        costes_directos = facturacion_linea * (costes_directos_pct / 100)
         margen_bruto = facturacion_linea - costes_directos
 
         resultados_lineas[linea_nombre] = {
@@ -160,86 +148,101 @@ for linea_nombre, linea in param['lineas_negocio'].items():
             "margen_bruto": margen_bruto
         }
 
-        st.subheader("📊 KPIs Resultados")
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            kpi_card("Facturación", facturacion_linea, None, tooltip="Facturación total línea")
-        with col2:
-            kpi_card("Costes Directos", costes_directos, (costes_directos / facturacion_linea) if facturacion_linea else None, tooltip="Costes directos sobre facturación línea")
-        with col3:
-            kpi_card("Margen Bruto", margen_bruto, (margen_bruto / facturacion_linea) if facturacion_linea else None, benchmark=(benchmark_linea['margen_bruto'][0], benchmark_linea['margen_bruto'][2]) if benchmark_linea else None, tipo="margen", tooltip="Margen sobre facturación línea")
-
-        if linea['personas'] > 0 and linea['jornadas_por_persona'] > 0:
-            jornadas_disponibles = nuevo_personas * linea['jornadas_por_persona']
-            jornadas_utilizadas = (ticket_medio / nueva_tarifa) * nuevo_unidades
-            utilizacion_real_pct = jornadas_utilizadas / jornadas_disponibles if jornadas_disponibles else 0
-
-            bm_util = benchmark_linea['utilizacion'] if benchmark_linea else [0.6, 0.7, 0.75]
-            fig_gauge = go.Figure(go.Indicator(
-                mode="gauge+number",
-                value=utilizacion_real_pct*100,
-                gauge={
-                    'axis': {'range': [0, 100]},
-                    'steps': [
-                        {'range': [0, bm_util[0]*100], 'color': COLOR_ROJO},
-                        {'range': [bm_util[0]*100, bm_util[2]*100], 'color': COLOR_VERDE},
-                        {'range': [bm_util[2]*100, 100], 'color': COLOR_NARANJA},
-                    ],
-                    'threshold': {'line': {'color': "black", 'width': 4}, 'thickness': 0.75, 'value': utilizacion_real_pct*100}
-                }
-            ))
-            fig_gauge.update_layout(height=250, margin=dict(t=0, b=0, l=0, r=0))
-            st.plotly_chart(fig_gauge, use_container_width=True)
-
-            st.markdown(f"""
-            **📋 Resumen Jornadas**
-            - Jornadas disponibles: {int(jornadas_disponibles)}
-            - Jornadas utilizadas: {int(jornadas_utilizadas)}
-            - % Utilización real: {round(utilizacion_real_pct*100,1)}%
-            - 🔄 Subactividad asumible ({int(bm_util[0]*100)}%): {int(jornadas_disponibles*(1-bm_util[0]))} jornadas
-            - 🚨 Exceso Subactividad: {max(0, int(jornadas_disponibles - jornadas_utilizadas - jornadas_disponibles*(1-bm_util[0])))}
-            - 💸 Coste asociado: {format_euro((jornadas_disponibles - jornadas_utilizadas)*(nuevo_coste_medio / linea['jornadas_por_persona']))}
-            """)
-
-        # Gráfico cascada línea
-        fig_cascada = go.Figure(go.Waterfall(
-            name=linea_nombre,
-            orientation="v",
-            measure=["relative", "relative", "total"],
-            x=["Facturación", "Costes Directos", "Margen Bruto"],
-            textposition="outside",
-            text=[format_euro(facturacion_linea), format_euro(-costes_directos), format_euro(margen_bruto)],
-            y=[facturacion_linea, -costes_directos, margen_bruto],
-            connector={"line": {"color": "rgb(63, 63, 63)"}}
-        ))
-        fig_cascada.update_layout(title=f"Cuenta de Resultados - {linea_nombre}", plot_bgcolor=COLOR_FONDO, paper_bgcolor=COLOR_FONDO, font=dict(color=COLOR_TEXTO), margin=dict(l=10, r=10, t=40, b=10))
-        st.plotly_chart(fig_cascada, use_container_width=True)
+# -------------------------------
+# 📦 Costes Fijos
+# -------------------------------
+st.subheader("🏢 Costes Fijos")
+costes_fijos_detalle = {}
+for categoria, valor in param['costes_fijos'].items():
+    nuevo_valor = st.slider(
+        f"{categoria.capitalize()} (€)",
+        min_value=0,
+        max_value=int(valor * 2),
+        value=int(valor),
+        step=1000,
+        format="%d"
+    )
+    costes_fijos_detalle[categoria] = nuevo_valor
+    porcentaje = nuevo_valor / facturacion_total
+    benchmark_categoria = benchmarks['global'].get(categoria.lower())
+    kpi_card(categoria.capitalize(), nuevo_valor, porcentaje,
+             benchmark=benchmark_categoria,
+             tooltip=f"Coste fijo en {categoria}")
 
 # -------------------------------
-# Resumen total por línea de negocio
+# 📊 Resultados Globales
 # -------------------------------
-st.header("📦 Resumen Total por Línea de Negocio")
+st.subheader("📊 Resultados Globales")
+
+total_facturacion = sum([v['facturacion'] for v in resultados_lineas.values()])
+total_costes_directos = sum([v['costes_directos'] for v in resultados_lineas.values()])
+total_costes_fijos = sum(costes_fijos_detalle.values())
+total_margen_bruto = total_facturacion - total_costes_directos
+total_ebitda = total_margen_bruto - total_costes_fijos
+
+col1, col2, col3, col4, col5 = st.columns(5)
+kpi_card("Facturación Total", total_facturacion, 1.0)
+kpi_card("Costes Directos", total_costes_directos, total_costes_directos/total_facturacion if total_facturacion else None)
+kpi_card("Margen Bruto", total_margen_bruto, total_margen_bruto/total_facturacion if total_facturacion else None)
+kpi_card("Costes Fijos", total_costes_fijos, total_costes_fijos/total_facturacion if total_facturacion else None)
+kpi_card("EBITDA", total_ebitda, total_ebitda/total_facturacion if total_facturacion else None)
+
+# Tabla resumen
+st.markdown("### 📊 Resumen por Línea de Negocio")
 resumen_df = pd.DataFrame([
-    {"Línea": k, "Facturación": format_euro(v["facturacion"]), "Costes Directos": f"{format_euro(v['costes_directos'])} ({v['costes_directos']/v['facturacion']*100:.1f}%)" if v['facturacion'] else "—", "Margen Bruto": f"{format_euro(v['margen_bruto'])} ({v['margen_bruto']/v['facturacion']*100:.1f}%)" if v['facturacion'] else "—"}
+    {
+        "Línea": k,
+        "Facturación": format_euro(v["facturacion"]),
+        "Costes Directos": f"{format_euro(v['costes_directos'])} ({v['costes_directos']/v['facturacion']*100:.1f}%)" if v['facturacion'] else "—",
+        "Margen Bruto": f"{format_euro(v['margen_bruto'])} ({v['margen_bruto']/v['facturacion']*100:.1f}%)" if v['facturacion'] else "—"
+    }
     for k, v in resultados_lineas.items()
 ])
 st.table(resumen_df)
 
 # -------------------------------
-# Resultados globales y botón exportar
+# 📥 Exportar a PDF
 # -------------------------------
-st.header("📊 Resultados Globales")
-# Aquí puedes colocar KPIs globales y el gráfico cascada principal (igual que antes)
-# Y al final el botón de exportar
+if st.button("📤 Exportar a PDF"):
+    filename = f"Simulador_PyG_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf"
+    c = canvas.Canvas(filename, pagesize=A4)
+    width, height = A4
 
-if st.button("📤 Exportar PDF"):
-    buffer = io.BytesIO()
-    c = canvas.Canvas(buffer, pagesize=A4)
-    c.drawString(2*cm, 28*cm, "Simulador PyG - Exportación")
-    c.drawString(2*cm, 27*cm, f"Fecha y hora: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
-    c.showPage()
+    c.setFont("Helvetica-Bold", 16)
+    c.drawString(50, height - 50, "Simulador de Escenarios - Resumen")
+
+    c.setFont("Helvetica", 12)
+    c.drawString(50, height - 80, f"Fecha: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+
+    y = height - 120
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(50, y, "Resultados Globales")
+    y -= 20
+    c.setFont("Helvetica", 12)
+    c.drawString(50, y, f"Facturación Total: {format_euro(total_facturacion)}")
+    y -= 15
+    c.drawString(50, y, f"Costes Directos: {format_euro(total_costes_directos)}")
+    y -= 15
+    c.drawString(50, y, f"Margen Bruto: {format_euro(total_margen_bruto)}")
+    y -= 15
+    c.drawString(50, y, f"Costes Fijos: {format_euro(total_costes_fijos)}")
+    y -= 15
+    c.drawString(50, y, f"EBITDA: {format_euro(total_ebitda)}")
+
+    y -= 30
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(50, y, "Resumen por Línea de Negocio")
+    y -= 20
+
+    c.setFont("Helvetica", 12)
+    for _, row in resumen_df.iterrows():
+        c.drawString(50, y, f"{row['Línea']}: Facturación={row['Facturación']}, "
+                            f"Costes Directos={row['Costes Directos']}, "
+                            f"Margen Bruto={row['Margen Bruto']}")
+        y -= 15
+        if y < 100:
+            c.showPage()
+            y = height - 50
+
     c.save()
-
-    buffer.seek(0)
-    now_str = datetime.now().strftime("%Y%m%d_%H%M")
-    st.download_button(label="📥 Descargar PDF", data=buffer, file_name=f"Simulador_PyG_{now_str}.pdf", mime="application/pdf")
+    st.success(f"📥 PDF exportado: {filename}")
